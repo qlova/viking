@@ -2,17 +2,17 @@ package compiler
 
 func (compiler *Compiler) Cast(t Type) (Expression, error) {
 	var expression Expression
-		expression.Type = t
-		
+	expression.Type = t
+
 	var other, err = compiler.ScanExpression()
 	if err != nil {
 		return Expression{}, err
 	}
-	
+
 	if !compiler.ScanIf(')') {
 		compiler.Unexpected()
 	}
-	
+
 	//Casting to integer.
 	if t.Equals(Integer) {
 		if other.Type.Equals(Symbol) {
@@ -22,7 +22,7 @@ func (compiler *Compiler) Cast(t Type) (Expression, error) {
 			return expression, nil
 		}
 	}
-	
+
 	//Casting to symbol.
 	if t.Equals(Symbol) {
 		if other.Type.Equals(Integer) {
@@ -32,6 +32,6 @@ func (compiler *Compiler) Cast(t Type) (Expression, error) {
 			return expression, nil
 		}
 	}
-	
-	return Expression{}, Unimplemented([]byte("casting "+other.Type.Name+" to "+t.Name))
+
+	return Expression{}, Unimplemented([]byte("casting " + other.Type.Name + " to " + t.Name))
 }

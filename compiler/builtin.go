@@ -16,24 +16,24 @@ func Builtin(check []byte) bool {
 
 func (compiler *Compiler) CompileBuiltin(builtin []byte) error {
 	if bytes.Equal(builtin, []byte("print")) {
-		
+
 		if !compiler.ScanIf('(') {
 			return compiler.Unexpected()
 		}
-		
+
 		var expression, err = compiler.ScanExpression()
 		if err != nil {
 			return err
 		}
-		
+
 		if !compiler.ScanIf(')') {
 			return compiler.Unexpected()
 		}
-		
+
 		compiler.Import("fmt")
-		
+
 		compiler.Write([]byte("fmt.Println("))
-		
+
 		if expression.Type.Equals(Symbol) {
 			compiler.Write([]byte("string("))
 			compiler.Write(expression.Bytes())
@@ -42,14 +42,14 @@ func (compiler *Compiler) CompileBuiltin(builtin []byte) error {
 			compiler.Write(expression.Bytes())
 		}
 		compiler.Write([]byte(")"))
-		
+
 		err = compiler.ScanLine()
 		if err != nil {
 			return err
 		}
-		
+
 		return nil
 	}
-	
-	return errors.New(string(builtin)+" is not a builtin")
+
+	return errors.New(string(builtin) + " is not a builtin")
 }

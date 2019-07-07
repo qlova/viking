@@ -23,14 +23,13 @@ func (compiler *Compiler) DefineVariable(name []byte) error {
 	if err != nil {
 		return err
 	}
-	
 
 	compiler.SetVariable(name, expression.Type)
 	compiler.Write([]byte("var "))
 	compiler.Write(name)
 	compiler.Write([]byte(" = "))
 	compiler.Write(expression.Bytes())
-	
+
 	if !compiler.ScanIf('\n') {
 		return compiler.Unexpected()
 	}
@@ -51,13 +50,12 @@ func (compiler *Compiler) AssignVariable(name []byte) error {
 	if !expression.Type.Equals(variable) {
 		return errors.New("type mismatch")
 	}
-	
 
 	compiler.SetVariable(name, expression.Type)
 	compiler.Write(name)
 	compiler.Write([]byte(" = "))
 	compiler.Write(expression.Bytes())
-	
+
 	if !compiler.ScanIf('\n') {
 		return compiler.Unexpected()
 	}

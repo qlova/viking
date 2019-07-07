@@ -4,17 +4,17 @@ import "errors"
 
 func Precedence(symbol []byte) int {
 	switch string(symbol) {
-		case ")", "]", "\n":
-			return -1
-		
-		default:
-			return 0
+	case ")", "]", "\n":
+		return -1
+
+	default:
+		return 0
 	}
 }
 
 func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression, err error) {
 	result = e
-	
+
 	//shunting:
 	for peek := compiler.Peek(); Precedence(peek) >= precedence; {
 
@@ -29,17 +29,17 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 		if err != nil {
 			return result, err
 		}
-		
+
 		peek = compiler.Peek()
 		for Precedence(peek) > precedence {
 			rhs, err = compiler.Shunt(rhs, Precedence(peek))
 			if err != nil {
 				return result, err
 			}
-			
+
 			peek = compiler.Peek()
 		}
-		
+
 		if result.Name == "array" {
 			if equal(symbol, "[") {
 				result, err = compiler.IndexArray(result, rhs)
@@ -49,7 +49,7 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 				continue
 			}
 		}
-		
+
 		if result.Equals(String) {
 			if equal(symbol, "+") {
 				result, err = compiler.BasicAdd(result, rhs)
@@ -59,7 +59,7 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 				continue
 			}
 		}
-		
+
 		//Lets do the shunting!
 
 		/*for i := range c.Shunts {
@@ -72,4 +72,3 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 	}
 	return result, nil
 }
- 
