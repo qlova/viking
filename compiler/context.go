@@ -2,6 +2,8 @@ package compiler
 
 import "github.com/qlova/viking/compiler/scanner"
 
+type Token = scanner.Token
+
 type Context struct {
 	scanner.Scanner
 	Directory string
@@ -9,7 +11,7 @@ type Context struct {
 	Export bool
 
 	//Type definitions.
-	TypeName             scanner.Token
+	TypeName             Token
 	InsideTypeDefinition bool
 	TypeDefinition       Type
 }

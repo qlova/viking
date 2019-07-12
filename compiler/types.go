@@ -21,11 +21,12 @@ var String = Type{Name: "string"}
 var Symbol = Type{Name: "symbol"}
 var Integer = Type{Name: "integer"}
 var Byte = Type{Name: "byte"}
+var Function = Type{Name: "function"}
 
 var Array = Type{Name: "array"}
 var List = Type{Name: "list"}
 
-var Types = []Type{String, Integer, Symbol, Array, List, Byte}
+var Types = []Type{String, Integer, Symbol, Array, List, Byte, Function}
 
 func (a Type) Equals(b Type) bool {
 
@@ -84,25 +85,45 @@ func (compiler *Compiler) Collection(t Type, subtype Type) (Expression, error) {
 	expression.Type = t
 	expression.Type.Subtype = &subtype
 
+	var next = compiler.Scan()
+
+	var index, other Expression
+	var err error
+
+	if next.Is("[") {
+		index, err = compiler.ScanExpression()
+		if err != nil {
+			return Expression{}, err
+		}
+
+		if !compiler.ScanIf(']') {
+			return Expression{}, compiler.Expecting(']')
+		}
+	}
+
 	if !compiler.ScanIf('(') {
 		return Expression{}, compiler.Expecting('(')
 	}
 
-	var other, err = compiler.ScanExpression()
-	if err != nil {
-		return Expression{}, err
-	}
-
 	if !compiler.ScanIf(')') {
-		return Expression{}, compiler.Expecting(')')
+		other, err = compiler.ScanExpression()
+		if err != nil {
+			return Expression{}, err
+		}
+
+		if !compiler.ScanIf(')') {
+			return Expression{}, compiler.Expecting(')')
+		}
 	}
 
 	switch t.Name {
 	case "array":
-		size, err := strconv.Atoi(string(other.Bytes()))
+		size, err := strconv.Atoi(string(index.Bytes()))
 		if err != nil {
 			return Expression{}, errors.New("Invalid array size " + strconv.Itoa(size))
 		}
+
+		other.String()
 
 		expression.Size = size
 		expression.Write(GoTypeOf(expression.Type))

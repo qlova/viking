@@ -48,9 +48,15 @@ func (compiler *Compiler) CompileStatement() error {
 
 	case "main":
 		compiler.Write(s("func main() {"))
+
+		compiler.GainScope()
 		return compiler.CompileBlock()
 
 	case "}":
+		if compiler.Depth == 0 {
+			return compiler.Unexpected()
+		}
+
 		compiler.Depth--
 		compiler.Write(s("}"))
 		compiler.LoseScope()
@@ -77,6 +83,23 @@ func (compiler *Compiler) CompileStatement() error {
 		} else {
 			return compiler.DefineVariable(token)
 		}
+	}
+
+	//Concept calls.
+	if concept, ok := compiler.Concepts[token.String()]; ok {
+		if len(concept.Arguments) == 0 {
+			if !compiler.ScanIf('(') {
+				return compiler.Expecting('(')
+			}
+			if !compiler.ScanIf(')') {
+				return compiler.Expecting(')')
+			}
+			compiler.Indent()
+			compiler.Write(s(concept.Name.String() + "()\n"))
+			return nil
+		}
+
+		return Unimplemented(token)
 	}
 
 	//Embedded types.
@@ -113,12 +136,54 @@ func (compiler *Compiler) CompileStatement() error {
 	//If the compiler depth is zero then we can assume an implicit definition.
 	if compiler.Depth == 0 {
 
+		if compiler.Concepts == nil {
+			compiler.Concepts = make(map[string]Concept)
+		}
+
+		//Function definition?
+		if compiler.ScanIf('(') {
+
+			if !compiler.ScanIf(')') {
+
+				var arguments, err = compiler.ScanArguments()
+				if err != nil {
+					return err
+				}
+
+				var cache = compiler.CacheBlock()
+
+				compiler.Concepts[token.String()] = Concept{
+					Cache:     cache,
+					Name:      token,
+					Arguments: arguments,
+				}
+
+				return nil
+			}
+
+			//Simple case. A function with an unknown return value.
+			compiler.GainScope()
+			var buffer = compiler.FlipBuffer()
+
+			compiler.DeferCleanup(func() {
+				buffer.Write(s("func " + token.String() + "() {\n"))
+				compiler.DumpBuffer()
+			})
+
+			compiler.Concepts[token.String()] = Concept{
+				Name: token,
+			}
+
+			return compiler.CompileBlock()
+		}
+
 		//Assuming type definition.
 		compiler.TypeName = token
 		compiler.InsideTypeDefinition = true
 
 		compiler.Write(s("func New" + token.String() + "() " + token.String() + " {\n"))
 
+		compiler.GainScope()
 		return compiler.CompileBlock()
 	}
 

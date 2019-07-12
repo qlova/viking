@@ -63,21 +63,35 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		return expression, nil
 	}
 
-	if t := compiler.GetType(token); Defined(t) {
+	if concept, ok := compiler.Concepts[token.String()]; ok {
+		if len(concept.Arguments) == 0 {
+			expression.Type = Function
+			expression.Write(token)
+			return expression, nil
+		}
+
+		return Expression{}, Unimplemented(token)
+	}
+
+	//Collections, arrays, lists etc.
+	if T := compiler.GetType(token); Defined(T) {
 		var next = compiler.Scan()
 
-		if equal(next, "(") {
+		if next.Is("(") {
 			if compiler.ScanIf(')') {
-				return compiler.Type(t)
+				return compiler.Type(T)
 			} else {
-				return compiler.Cast(t)
+				return compiler.Cast(T)
 			}
 		}
 
-		if equal(next, ".") {
-			var collection = compiler.GetType(compiler.Scan())
-			if Defined(collection) {
-				return compiler.Collection(collection, t)
+		if next.Is(".") {
+			var collection = T
+
+			var subtype = compiler.GetType(compiler.Scan())
+
+			if Defined(subtype) {
+				return compiler.Collection(collection, subtype)
 			} else {
 				return Expression{}, errors.New("No such collection " + string(compiler.LastToken))
 			}

@@ -41,7 +41,7 @@ func (compiler *Compiler) CompileBuiltin(builtin []byte) error {
 		} else {
 			compiler.Write(expression.Bytes())
 		}
-		compiler.Write([]byte(")"))
+		compiler.Write([]byte(")\n"))
 
 		err = compiler.ScanLine()
 		if err != nil {

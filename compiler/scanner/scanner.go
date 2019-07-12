@@ -11,6 +11,10 @@ type Scanner struct {
 	Reader    *bufio.Reader
 	NextToken Token
 	LastToken Token
+
+	Line               []byte
+	LineNumber, Column int
+	Filename           string
 }
 
 func (scanner *Scanner) SetReader(reader io.Reader) {
@@ -38,6 +42,16 @@ func (scanner *Scanner) ScanIf(b byte) bool {
 func (scanner *Scanner) Scan() Token {
 	var token = scanner.scan()
 	scanner.LastToken = token
+
+	//Record line numbers, character position and the last line.
+	scanner.Column += len(token)
+	scanner.Line = append(scanner.Line, token...)
+	if token.Is("\n") {
+		scanner.Column = 0
+		scanner.LineNumber++
+		scanner.Line = nil
+	}
+
 	return token
 }
 
@@ -95,7 +109,7 @@ func (scanner *Scanner) scan() Token {
 					continue
 				}
 
-			case ':', '\n', '(', ')', '{', '}', '[', ']', '.':
+			case ':', '\n', '(', ')', '{', '}', '[', ']', '.', ',':
 				if len(token) > 0 {
 					return token
 				} else {

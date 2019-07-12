@@ -7,11 +7,11 @@ func Defined(T Type) bool {
 }
 
 func (compiler *Compiler) SetVariable(name []byte, T Type) {
-	compiler.Scope[len(compiler.Scope)-1][string(name)] = T
+	compiler.Scope[len(compiler.Scope)-1].Table[string(name)] = T
 }
 
 func (compiler *Compiler) GetVariable(name []byte) Type {
-	return compiler.Scope[len(compiler.Scope)-1][string(name)]
+	return compiler.Scope[len(compiler.Scope)-1].Table[string(name)]
 }
 
 func (compiler *Compiler) DefineVariable(name []byte) error {

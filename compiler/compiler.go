@@ -19,26 +19,75 @@ func (compiler *Compiler) Expecting(symbol byte) error {
 	return errors.New("Expecting " + string(symbol))
 }
 
+type Concept struct {
+	Name      Token
+	Arguments []Argument
+	Cache
+}
+
 type Compiler struct {
 	Context
+	Buffer
 
 	Depth int
-
-	Head bytes.Buffer
-	Body bytes.Buffer
 
 	ExpectedOutput []byte
 
 	Imports map[string]struct{}
 
-	Scope []map[string]Type
+	Scope []Scope
 
 	Frames []Context
+
+	Buffers []Buffer
+
+	Concepts map[string]Concept
+}
+
+func NewScope() Scope {
+	return Scope{
+		Table: make(map[string]Type),
+	}
+}
+
+type Scope struct {
+	Table    map[string]Type
+	Cleanups []func()
+}
+
+func (compiler *Compiler) DeferCleanup(f func()) {
+	var scope = len(compiler.Scope) - 1
+	compiler.Scope[scope].Cleanups = append(compiler.Scope[scope].Cleanups, f)
+}
+
+type Buffer struct {
+	Head, Body bytes.Buffer
+}
+
+func (compiler *Compiler) FlipBuffer() *Buffer {
+	var current = compiler.Buffer
+
+	compiler.Buffers = append(compiler.Buffers, current)
+
+	compiler.Buffer = Buffer{}
+
+	return &compiler.Buffers[len(compiler.Buffers)-1]
+}
+
+func (compiler *Compiler) DumpBuffer() {
+	var last = compiler.Buffers[len(compiler.Buffers)-1]
+
+	last.Head.Write(compiler.Head.Bytes())
+	last.Body.Write(compiler.Body.Bytes())
+
+	compiler.Buffer = last
+
+	compiler.Buffers = compiler.Buffers[:len(compiler.Buffers)-1]
 }
 
 func (compiler *Compiler) GainScope() {
 	compiler.Depth++
-	compiler.Scope = append(compiler.Scope, make(map[string]Type))
+	compiler.Scope = append(compiler.Scope, NewScope())
 }
 
 func (compiler *Compiler) LoseScope() {
@@ -63,6 +112,11 @@ func (compiler *Compiler) LoseScope() {
 		compiler.TypeDefinition = Type{}
 	}
 
+	var scope = compiler.Scope[len(compiler.Scope)-1]
+	for _, cleanup := range scope.Cleanups {
+		cleanup()
+	}
+
 	compiler.Scope = compiler.Scope[:len(compiler.Scope)-1]
 	compiler.Depth--
 }
@@ -79,12 +133,12 @@ func (compiler *Compiler) Import(pkg string) {
 	}
 }
 
-func (compiler *Compiler) Write(data []byte) {
-	compiler.Body.Write(data)
+func (buffer *Buffer) Write(data []byte) {
+	buffer.Body.Write(data)
 }
 
-func (compiler *Compiler) WriteLine() {
-	compiler.Body.Write([]byte{'\n'})
+func (buffer *Buffer) WriteLine() {
+	buffer.Body.Write([]byte{'\n'})
 }
 
 func (compiler *Compiler) Indent(writers ...io.Writer) {
@@ -117,7 +171,7 @@ func (compiler *Compiler) ScanLine() error {
 func (compiler *Compiler) Compile() error {
 	files, err := ioutil.ReadDir(compiler.Directory)
 	if err != nil {
-		return err
+		return Error{compiler, err}
 	}
 
 	compiler.Head.Write([]byte("package main\n\n"))
@@ -126,7 +180,7 @@ func (compiler *Compiler) Compile() error {
 		if path.Ext(file.Name()) == ".i" {
 			err := compiler.CompileFile(file.Name())
 			if err != nil {
-				return err
+				return Error{compiler, err}
 			}
 		}
 	}
@@ -135,8 +189,6 @@ func (compiler *Compiler) Compile() error {
 }
 
 func (compiler *Compiler) CompileBlock() error {
-	compiler.GainScope()
-
 	if compiler.ScanIf(':') {
 		defer func() {
 			compiler.LoseScope()
@@ -148,8 +200,6 @@ func (compiler *Compiler) CompileBlock() error {
 		if !compiler.ScanIf('\n') {
 			return compiler.Unexpected()
 		}
-
-		compiler.Depth++
 	}
 
 	return nil
