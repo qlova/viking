@@ -4,16 +4,61 @@ import "bytes"
 import "errors"
 
 //Builtins is a list of all builtin functions.
-var Builtins = []string{"print", "write"}
+var Builtins = []string{"print", "write", "in"}
 
 //Builtin returns true if the builtin exists.
-func Builtin(check []byte) bool {
+func Builtin(check Token) bool {
 	for _, builtin := range Builtins {
-		if bytes.Equal([]byte(builtin), check) {
+		if check.Is(builtin) {
 			return true
 		}
 	}
 	return false
+}
+
+//CallBuiltin calls a builtin function and returns the resulting expression.
+func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
+	var expression Expression
+
+	switch builtin.String() {
+	case "in":
+		if !compiler.ScanIf('(') {
+			return Expression{}, compiler.Expecting('(')
+		}
+
+		var argument, err = compiler.ScanExpression()
+		if err != nil {
+			return Expression{}, err
+		}
+
+		if !compiler.ScanIf(')') {
+			return Expression{}, compiler.Expecting(')')
+		}
+
+		if argument.Equals(Symbol) {
+			expression.Type = String
+			expression.WriteString("in_symbol(")
+			expression.Write(argument.Bytes())
+			expression.WriteString(")")
+
+			compiler.Import("os")
+			compiler.Import("bufio")
+			compiler.Require("var std_in = bufio.NewReader(os.Stdin)\n")
+			compiler.Require(`func in_symbol(r rune) string {
+	s, err := std_in.ReadString(byte(r))
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	return s[:len(s)-1]
+}
+`)
+			return expression, nil
+		}
+
+		return Expression{}, errors.New("invalid type " + expression.Type.Name + " passed to builtin")
+	}
+	return Expression{}, errors.New("invalid builtin " + builtin.String())
 }
 
 //CompileBuiltin compiles a call to a builtin.

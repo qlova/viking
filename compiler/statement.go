@@ -30,6 +30,13 @@ func (compiler *Compiler) CompileStatement() error {
 		//Special output comment for tests.
 		if len(token) > len("//output: ") && bytes.Equal(token[:len("//output: ")], []byte("//output: ")) {
 			compiler.ExpectedOutput = token[len("//output: "):]
+			compiler.ExpectedOutput = bytes.Replace(compiler.ExpectedOutput, []byte(`\n`), []byte("\n"), -1)
+		}
+
+		//Special output comment for tests.
+		if len(token) > len("//input: ") && bytes.Equal(token[:len("//input: ")], []byte("//input: ")) {
+			compiler.ProvidedInput = token[len("//input: "):]
+			compiler.ProvidedInput = bytes.Replace(compiler.ProvidedInput, []byte(`\n`), []byte("\n"), -1)
 		}
 
 		return nil

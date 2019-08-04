@@ -68,6 +68,27 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 				}
 				continue
 			}
+			if equal(symbol, "*") {
+				result, err = compiler.BasicMultiply(result, rhs)
+				if err != nil {
+					return result, err
+				}
+				continue
+			}
+			if equal(symbol, "/") {
+				result, err = compiler.BasicDivide(result, rhs)
+				if err != nil {
+					return result, err
+				}
+				continue
+			}
+			if equal(symbol, "-") {
+				result, err = compiler.BasicSubtract(result, rhs)
+				if err != nil {
+					return result, err
+				}
+				continue
+			}
 		}
 
 		//Lets do the shunting!

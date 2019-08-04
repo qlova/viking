@@ -21,8 +21,10 @@ type Compiler struct {
 	Depths []int
 
 	ExpectedOutput []byte
+	ProvidedInput  []byte
 
-	Imports map[string]struct{}
+	Imports      map[string]struct{}
+	Dependencies map[string]struct{}
 
 	Scope  []Scope
 	Scopes [][]Scope
@@ -162,6 +164,19 @@ func (compiler *Compiler) Import(pkg string) {
 		compiler.Imports[pkg] = struct{}{}
 		compiler.Neck.Write([]byte(`import "` + pkg + `"`))
 		compiler.Neck.Write([]byte("\n"))
+	}
+}
+
+//Require writes the provided code to the neck of the buffer if it hasn't been required already.
+func (compiler *Compiler) Require(code string) {
+	if compiler.Dependencies == nil {
+		compiler.Dependencies = make(map[string]struct{})
+	}
+
+	if _, ok := compiler.Dependencies[code]; !ok {
+		compiler.Dependencies[code] = struct{}{}
+
+		compiler.Head.Write([]byte(code))
 	}
 }
 

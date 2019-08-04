@@ -46,9 +46,6 @@ var Function = Type{Name: "function"}
 //Array is a fixed-length sequence of values.
 var Array = Type{Name: "array"}
 
-//List is a dynamic-length sequence of values.
-var List = Type{Name: "list"}
-
 //Variadic is a dynamic-length sequence of values.
 var Variadic = Type{Name: "variadic"}
 
@@ -113,7 +110,11 @@ func (compiler *Compiler) Type(t Type) (Expression, error) {
 func GoTypeOf(t Type) []byte {
 	switch t.Name {
 	case "array":
-		return append(append([]byte("["+strconv.Itoa(t.Size)+"]"), GoTypeOf(*t.Subtype)...), s("{}")...)
+		return append(append([]byte("["+strconv.Itoa(t.Size)+"]"), GoTypeOf(*t.Subtype)...))
+	case "list":
+		return append(append([]byte("[]"), GoTypeOf(*t.Subtype)...))
+	case "string":
+		return s("string")
 	case "integer":
 		return s("int")
 	case "function":
@@ -173,6 +174,7 @@ func (compiler *Compiler) Collection(t Type, subtype Type) (Expression, error) {
 
 		expression.Size = size
 		expression.Write(GoTypeOf(expression.Type))
+		expression.WriteString("{}")
 		return expression, nil
 	}
 

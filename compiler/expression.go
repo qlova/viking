@@ -62,6 +62,59 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		return expression, nil
 	}
 
+	//List expression.
+	if token.Is("[") {
+		expression.Type = List
+
+		var first, err = compiler.ScanExpression()
+		if err != nil {
+			return Expression{}, err
+		}
+
+		expression.Type.Subtype = &first.Type
+
+		expression.Write(GoTypeOf(expression.Type))
+		expression.WriteByte('{')
+		expression.Write(first.Bytes())
+
+		for compiler.ScanIf(',') {
+			expression.WriteByte(',')
+
+			var item, err = compiler.ScanExpression()
+			if err != nil {
+				return Expression{}, err
+			}
+			expression.Write(item.Bytes())
+		}
+
+		if !compiler.ScanIf(']') {
+			return Expression{}, compiler.Expecting(']')
+		}
+		expression.WriteByte('}')
+
+		return expression, nil
+	}
+
+	//Length expression.
+	if token.Is("#") {
+		expression.Type = Integer
+
+		var collection, err = compiler.ScanExpression()
+		if err != nil {
+			return Expression{}, err
+		}
+
+		if collection.Is(List) {
+			expression.WriteString("len(")
+			expression.Write(collection.Bytes())
+			expression.WriteString(")")
+
+			return expression, nil
+		}
+
+		return Expression{}, errors.New("cannot take the length of " + collection.Type.Name)
+	}
+
 	//Variable expression.
 	if variable := compiler.GetVariable(token); Defined(variable) {
 		expression.Type = variable
@@ -78,6 +131,12 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		}
 
 		return compiler.CallConcept(token)
+	}
+
+	//Is this a builtin call?
+	if Builtin(token) {
+		compiler.Indent()
+		return compiler.CallBuiltin(token)
 	}
 
 	//Collections, arrays, lists etc.
