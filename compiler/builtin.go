@@ -3,8 +3,10 @@ package compiler
 import "bytes"
 import "errors"
 
-var Builtins = []string{"print"}
+//Builtins is a list of all builtin functions.
+var Builtins = []string{"print", "write"}
 
+//Builtin returns true if the builtin exists.
 func Builtin(check []byte) bool {
 	for _, builtin := range Builtins {
 		if bytes.Equal([]byte(builtin), check) {
@@ -14,8 +16,9 @@ func Builtin(check []byte) bool {
 	return false
 }
 
+//CompileBuiltin compiles a call to a builtin.
 func (compiler *Compiler) CompileBuiltin(builtin []byte) error {
-	if bytes.Equal(builtin, []byte("print")) {
+	if bytes.Equal(builtin, []byte("print")) || bytes.Equal(builtin, []byte("write")) {
 
 		if !compiler.ScanIf('(') {
 			return compiler.Unexpected()
@@ -32,7 +35,11 @@ func (compiler *Compiler) CompileBuiltin(builtin []byte) error {
 
 		compiler.Import("fmt")
 
-		compiler.Write([]byte("fmt.Println("))
+		if bytes.Equal(builtin, []byte("write")) {
+			compiler.Write([]byte("fmt.Print("))
+		} else {
+			compiler.Write([]byte("fmt.Println("))
+		}
 
 		if expression.Type.Equals(Symbol) {
 			compiler.Write([]byte("string("))

@@ -1,3 +1,4 @@
+//Package scanner provides a 'i' syntax scanner.
 package scanner
 
 import (
@@ -7,8 +8,10 @@ import (
 	"strconv"
 )
 
+//Scanner is an 'i' token scanner.
 type Scanner struct {
-	Reader    *bufio.Reader
+	Reader *bufio.Reader
+
 	NextToken Token
 	LastToken Token
 
@@ -17,19 +20,23 @@ type Scanner struct {
 	Filename           string
 }
 
+//SetReader sets the reader for the scanner.
 func (scanner *Scanner) SetReader(reader io.Reader) {
 	scanner.Reader = bufio.NewReader(reader)
 }
 
+//Peek returns the next token without advancing the scanner.
 func (scanner *Scanner) Peek() Token {
 	scanner.NextToken = scanner.scan()
 	return scanner.NextToken
 }
 
+//Unexpected returns an 'unexpected' error.
 func (scanner *Scanner) Unexpected() error {
-	return errors.New("Unexpected " + string(scanner.Peek()))
+	return errors.New("unexpected " + string(scanner.Peek()))
 }
 
+//ScanIf returns true and scans if the next token matches 'b'
 func (scanner *Scanner) ScanIf(b byte) bool {
 	var peek = scanner.Peek()
 	if peek != nil && len(peek) > 0 && peek[0] == b {
@@ -39,11 +46,18 @@ func (scanner *Scanner) ScanIf(b byte) bool {
 	return false
 }
 
+//Scan advances the scanner and returns the next token.
 func (scanner *Scanner) Scan() Token {
 	var token = scanner.scan()
 	scanner.LastToken = token
 
 	//Record line numbers, character position and the last line.
+
+	//Line numbers should always start at one.
+	if scanner.LineNumber == 0 {
+		scanner.LineNumber = 1
+	}
+
 	scanner.Column += len(token)
 	scanner.Line = append(scanner.Line, token...)
 	if token.Is("\n") {
@@ -109,54 +123,52 @@ func (scanner *Scanner) scan() Token {
 					continue
 				}
 
-			case ':', '\n', '(', ')', '{', '}', '[', ']', '.', ',':
+			//These symbols break a token.
+			case ':', '\n', '(', ')', '{', '}', '[', ']', '.', ',', '$':
 				if len(token) > 0 {
-					return token
-				} else {
-
-					_, err = scanner.Reader.ReadByte()
-					if err != nil {
-						return nil
-					}
-
-					return Token{peek[0]}
+					return token //This is an endquote.
 				}
+
+				_, err = scanner.Reader.ReadByte()
+				if err != nil {
+					return nil
+				}
+
+				return Token{peek[0]}
 
 			//Quotes
 			case '"':
 				if len(token) > 0 {
-					return token
-				} else {
-
-					_, err = scanner.Reader.ReadByte()
-					if err != nil {
-						return nil
-					}
-					s, err := scanner.Reader.ReadBytes('"')
-					if err != nil {
-						return nil
-					}
-
-					return append(Token{'"'}, s...)
+					return token //This is an endquote.
 				}
 
-			//Quotes
+				_, err = scanner.Reader.ReadByte()
+				if err != nil {
+					return nil
+				}
+				s, err := scanner.Reader.ReadBytes('"')
+				if err != nil {
+					return nil
+				}
+
+				return append(Token{'"'}, s...)
+
+			//Symbols
 			case '\'':
 				if len(token) > 0 {
-					return token
-				} else {
-
-					_, err = scanner.Reader.ReadByte()
-					if err != nil {
-						return nil
-					}
-					s, err := scanner.Reader.ReadBytes('\'')
-					if err != nil {
-						return nil
-					}
-
-					return append(Token{'\''}, s...)
+					return token //This is an endquote.
 				}
+
+				_, err = scanner.Reader.ReadByte()
+				if err != nil {
+					return nil
+				}
+				s, err := scanner.Reader.ReadBytes('\'')
+				if err != nil {
+					return nil
+				}
+
+				return append(Token{'\''}, s...)
 			}
 
 			if peek[0] == '/' {

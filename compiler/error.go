@@ -1,8 +1,12 @@
 package compiler
 
-import "fmt"
-import "strings"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
+//Error is a compiler error.
 type Error struct {
 	compiler *Compiler
 	err      error
@@ -10,5 +14,16 @@ type Error struct {
 
 func (err Error) Error() string {
 	var compiler = err.compiler
-	return fmt.Sprint(compiler.LineNumber, ": ", string(compiler.Line), "\n", strings.Repeat(" ", compiler.Column+3), "^\n", err.err.Error())
+	var RestOfTheLine, _ = compiler.Reader.ReadString('\n')
+	return fmt.Sprint(compiler.LineNumber, ": ", string(compiler.Line), RestOfTheLine, "\n", strings.Repeat(" ", compiler.Column+3), "^\n", err.err.Error())
+}
+
+//Unimplemented is an error describing that the component is unimplemented.
+func Unimplemented(component []byte) error {
+	return errors.New("unimplemented " + string(component))
+}
+
+//Expecting returns an error in the form "expecting [token]"
+func (compiler *Compiler) Expecting(symbol byte) error {
+	return errors.New("expecting " + string(symbol))
 }

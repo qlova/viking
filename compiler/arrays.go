@@ -2,6 +2,7 @@ package compiler
 
 import "errors"
 
+//IndexArray indexes the array with the specified index.
 func (compiler *Compiler) IndexArray(array, index Expression) (Expression, error) {
 	if !index.Type.Equals(Integer) {
 		return Expression{}, errors.New("Only integers can be used to index an array! Not " + index.Type.Name)
@@ -23,6 +24,7 @@ func (compiler *Compiler) IndexArray(array, index Expression) (Expression, error
 	return expression, nil
 }
 
+//ModifyArray scans an array modification.
 func (compiler *Compiler) ModifyArray(array []byte) error {
 	ArrayType := compiler.GetVariable(array)
 

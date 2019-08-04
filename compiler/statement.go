@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+//CompileStatement compiles the next statement.
 func (compiler *Compiler) CompileStatement() error {
 	var token = compiler.Scan()
 	/*switch token {
@@ -17,13 +18,16 @@ func (compiler *Compiler) CompileStatement() error {
 		return io.EOF
 	}
 
+	//Ignore newlines.
 	if bytes.Equal(token, []byte("\n")) {
 		return nil
 	}
 
+	//Comments.
 	if len(token) > 2 && token[0] == '/' && token[1] == '/' {
 		compiler.Write(token)
 
+		//Special output comment for tests.
 		if len(token) > len("//output: ") && bytes.Equal(token[:len("//output: ")], []byte("//output: ")) {
 			compiler.ExpectedOutput = token[len("//output: "):]
 		}
@@ -33,12 +37,14 @@ func (compiler *Compiler) CompileStatement() error {
 
 	switch token.String() {
 
+	//Import statement.
 	case "import":
 		var namespace = compiler.Scan()
 		compiler.NewContext()
 		compiler.CompileFile(string(namespace) + ".i")
 		return nil
 
+	//Export tag.
 	case ".":
 		compiler.Export = true
 		defer func() {
@@ -46,29 +52,77 @@ func (compiler *Compiler) CompileStatement() error {
 		}()
 		return compiler.CompileStatement()
 
+	//Main statement.
 	case "main":
 		compiler.Write(s("func main() {"))
 
 		compiler.GainScope()
 		return compiler.CompileBlock()
 
+	case "for":
+		var name = compiler.Scan()
+
+		if !compiler.Scan().Is("in") {
+			return errors.New("expecting in")
+		}
+
+		var collection, err = compiler.ScanExpression()
+		if err != nil {
+			return err
+		}
+
+		if !collection.Is(Variadic) {
+			return errors.New("unimplemented for loop for " + collection.Type.Name)
+		}
+
+		compiler.Indent()
+		compiler.WriteString("for ")
+		compiler.WriteString("_,")
+		compiler.Write(name)
+		compiler.WriteString(":= range ")
+		compiler.Write(collection.Bytes())
+		compiler.WriteString("{")
+
+		compiler.GainScope()
+		compiler.SetVariable(name, *collection.Type.Subtype)
+
+		return compiler.CompileBlock()
+
+	//Return statement.
+	case "return":
+		compiler.WriteString("return ")
+
+		expression, err := compiler.ScanExpression()
+		if err != nil {
+			return err
+		}
+		*compiler.Returns = expression.Type
+
+		compiler.Write(expression.Bytes())
+		return nil
+
+	//Close block.
 	case "}":
 		if compiler.Depth == 0 {
 			return compiler.Unexpected()
 		}
 
 		compiler.Depth--
+		compiler.Indent()
+		compiler.Depth++
 		compiler.Write(s("}"))
 		compiler.LoseScope()
 		return nil
 
 	}
 
+	//Is this a builtin call?
 	if Builtin(token) {
 		compiler.Indent()
 		return compiler.CompileBuiltin(token)
 	}
 
+	//Array modification.
 	if compiler.Peek().Is("[") {
 		if Defined(compiler.GetVariable(token)) {
 			compiler.Indent()
@@ -76,30 +130,26 @@ func (compiler *Compiler) CompileStatement() error {
 		}
 	}
 
-	if compiler.Peek().Is("=") {
-		compiler.Indent()
-		if Defined(compiler.GetVariable(token)) {
-			return compiler.AssignVariable(token)
-		} else {
+	//Variable modification.
+	if compiler.ScanIf('$') {
+		if compiler.ScanIf('=') {
+			compiler.Indent()
+			if Defined(compiler.GetVariable(token)) {
+				return compiler.AssignVariable(token)
+			}
 			return compiler.DefineVariable(token)
 		}
+		return compiler.Unexpected()
+	}
+
+	//Function calls.
+	if T := compiler.GetVariable(token); Defined(T) && T.Is(Function) && compiler.Peek().Is("(") {
+		return compiler.CallFunction(token)
 	}
 
 	//Concept calls.
-	if concept, ok := compiler.Concepts[token.String()]; ok {
-		if len(concept.Arguments) == 0 {
-			if !compiler.ScanIf('(') {
-				return compiler.Expecting('(')
-			}
-			if !compiler.ScanIf(')') {
-				return compiler.Expecting(')')
-			}
-			compiler.Indent()
-			compiler.Write(s(concept.Name.String() + "()\n"))
-			return nil
-		}
-
-		return Unimplemented(token)
+	if _, ok := compiler.Concepts[token.String()]; ok {
+		return compiler.RunConcept(token)
 	}
 
 	//Embedded types.
@@ -143,6 +193,7 @@ func (compiler *Compiler) CompileStatement() error {
 		//Function definition?
 		if compiler.ScanIf('(') {
 
+			//Concept with multiple arguments.
 			if !compiler.ScanIf(')') {
 
 				var arguments, err = compiler.ScanArguments()
@@ -161,20 +212,14 @@ func (compiler *Compiler) CompileStatement() error {
 				return nil
 			}
 
-			//Simple case. A function with an unknown return value.
-			compiler.GainScope()
-			var buffer = compiler.FlipBuffer()
-
-			compiler.DeferCleanup(func() {
-				buffer.Write(s("func " + token.String() + "() {\n"))
-				compiler.DumpBuffer()
-			})
+			var cache = compiler.CacheBlock()
 
 			compiler.Concepts[token.String()] = Concept{
-				Name: token,
+				Cache: cache,
+				Name:  token,
 			}
 
-			return compiler.CompileBlock()
+			return nil
 		}
 
 		//Assuming type definition.
@@ -187,5 +232,5 @@ func (compiler *Compiler) CompileStatement() error {
 		return compiler.CompileBlock()
 	}
 
-	return Unimplemented(token)
+	return Unimplemented(s("statement" + token.String()))
 }

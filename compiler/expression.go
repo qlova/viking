@@ -5,11 +5,13 @@ import "bytes"
 import "strconv"
 import "errors"
 
+//Expression is a type with content.
 type Expression struct {
 	Type
 	bytes.Buffer
 }
 
+//ScanExpression returns the next expression or an error.
 func (compiler *Compiler) ScanExpression() (Expression, error) {
 	var expression, err = compiler.scanExpression()
 	if err != nil {
@@ -39,30 +41,35 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		return expression, nil
 	}
 
+	//String expression.
 	if token[0] == '"' {
 		expression.Type = String
 		expression.Write(token)
 		return expression, nil
 	}
 
+	//Symbol expresion.
 	if token[0] == '\'' {
 		expression.Type = Symbol
 		expression.Write(token)
 		return expression, nil
 	}
 
+	//Integer expression.
 	if _, err := strconv.Atoi(string(token)); err == nil {
 		expression.Type = Integer
 		expression.Write(token)
 		return expression, nil
 	}
 
+	//Variable expression.
 	if variable := compiler.GetVariable(token); Defined(variable) {
 		expression.Type = variable
 		expression.Write(token)
 		return expression, nil
 	}
 
+	//Function calls.
 	if concept, ok := compiler.Concepts[token.String()]; ok {
 		if len(concept.Arguments) == 0 {
 			expression.Type = Function
@@ -70,7 +77,7 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 			return expression, nil
 		}
 
-		return Expression{}, Unimplemented(token)
+		return compiler.CallConcept(token)
 	}
 
 	//Collections, arrays, lists etc.
@@ -80,9 +87,8 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		if next.Is("(") {
 			if compiler.ScanIf(')') {
 				return compiler.Type(T)
-			} else {
-				return compiler.Cast(T)
 			}
+			return compiler.ScanCast(T)
 		}
 
 		if next.Is(".") {
@@ -92,9 +98,8 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 
 			if Defined(subtype) {
 				return compiler.Collection(collection, subtype)
-			} else {
-				return Expression{}, errors.New("No such collection " + string(compiler.LastToken))
 			}
+			return Expression{}, errors.New("No such collection " + string(compiler.LastToken))
 		}
 
 		return Expression{}, Unimplemented(append(append(token, next...), compiler.Peek()...))

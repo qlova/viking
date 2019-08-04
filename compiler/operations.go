@@ -2,6 +2,7 @@ package compiler
 
 import "errors"
 
+//BasicAdd returns a + b
 func (compiler *Compiler) BasicAdd(a, b Expression) (Expression, error) {
 	if !a.Type.Equals(b.Type) {
 		return Expression{}, errors.New("Type mismatch")

@@ -1,24 +1,29 @@
 package compiler
 
-import "errors"
+import (
+	"errors"
+)
 
+//Defined returns true if T is defined.
 func Defined(T Type) bool {
 	return T.Name != ""
 }
 
+//SetVariable sets a new variable.
 func (compiler *Compiler) SetVariable(name []byte, T Type) {
 	compiler.Scope[len(compiler.Scope)-1].Table[string(name)] = T
 }
 
+//GetVariable returns the variable with the given name.
 func (compiler *Compiler) GetVariable(name []byte) Type {
+	if len(compiler.Scope) <= 0 {
+		return Type{}
+	}
 	return compiler.Scope[len(compiler.Scope)-1].Table[string(name)]
 }
 
+//DefineVariable defines the variable 'name' with the scanned value.
 func (compiler *Compiler) DefineVariable(name []byte) error {
-	if !compiler.ScanIf('=') {
-		compiler.Unexpected()
-	}
-
 	var expression, err = compiler.ScanExpression()
 	if err != nil {
 		return err
@@ -37,10 +42,8 @@ func (compiler *Compiler) DefineVariable(name []byte) error {
 	return nil
 }
 
+//AssignVariable modifies the variable 'name' with the scanned value.
 func (compiler *Compiler) AssignVariable(name []byte) error {
-	if !compiler.ScanIf('=') {
-		compiler.Unexpected()
-	}
 	var variable = compiler.GetVariable(name)
 
 	var expression, err = compiler.ScanExpression()

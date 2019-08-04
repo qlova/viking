@@ -1,10 +1,16 @@
 package compiler
 
-import "errors"
+import (
+	"errors"
+)
 
+//Precedence returns i's precedence for the specified symbol.
 func Precedence(symbol []byte) int {
+	if symbol == nil {
+		return -1
+	}
 	switch string(symbol) {
-	case ")", "]", "\n":
+	case ",", ")", "]", "\n", "", "}":
 		return -1
 
 	default:
@@ -12,6 +18,7 @@ func Precedence(symbol []byte) int {
 	}
 }
 
+//Shunt shunts an expression with the next part of the expression. Emplying operators.
 func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression, err error) {
 	result = e
 
@@ -21,9 +28,12 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 		if Precedence(compiler.Peek()) == -1 {
 			break
 		}
+
 		precedence := Precedence(peek)
 		symbol := peek
-		compiler.Scan()
+		if compiler.Scan() == nil {
+			break
+		}
 
 		rhs, err := compiler.ScanExpression()
 		if err != nil {
@@ -50,7 +60,7 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 			}
 		}
 
-		if result.Equals(String) {
+		if result.Equals(String) || result.Equals(Integer) {
 			if equal(symbol, "+") {
 				result, err = compiler.BasicAdd(result, rhs)
 				if err != nil {

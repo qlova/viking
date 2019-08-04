@@ -2,12 +2,14 @@ package compiler
 
 import "errors"
 
+//Argument is a function/concept argument.
 type Argument struct {
 	Token
 	Type
 	Variadic bool
 }
 
+//ScanArguments scans a function/concept argument definition.
 func (compiler *Compiler) ScanArguments() ([]Argument, error) {
 	var arguments []Argument
 
