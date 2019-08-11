@@ -13,6 +13,30 @@ func Precedence(symbol []byte) int {
 	case ",", ")", "]", "\n", "", "}":
 		return -1
 
+	case "|":
+		return 0
+
+	case "&":
+		return 1
+
+	case "=", "<", ">", "!":
+		return 2
+
+	case "+", "-":
+		return 3
+
+	case "*", "/", `%`:
+		return 4
+
+	case "^":
+		return 5
+
+	case "(", "[":
+		return 6
+
+	case ".":
+		return 7
+
 	default:
 		return 0
 	}
@@ -50,7 +74,7 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 			peek = compiler.Peek()
 		}
 
-		if result.Name == "array" {
+		if result.Is(Array) || result.Is(List) {
 			if equal(symbol, "[") {
 				result, err = compiler.IndexArray(result, rhs)
 				if err != nil {
@@ -60,30 +84,62 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 			}
 		}
 
-		if result.Equals(String) || result.Equals(Integer) {
-			if equal(symbol, "+") {
-				result, err = compiler.BasicAdd(result, rhs)
+		if result.Equals(String) {
+			switch s := symbol.String(); s {
+			case "+":
+				result, err = compiler.BasicOperation(s, result, rhs)
 				if err != nil {
 					return result, err
 				}
 				continue
 			}
-			if equal(symbol, "*") {
-				result, err = compiler.BasicMultiply(result, rhs)
+		}
+
+		switch s := symbol.String(); s {
+		case "=":
+			result, err = compiler.BasicEquals(result, rhs)
+			if err != nil {
+				return result, err
+			}
+			continue
+		case "&":
+			result, err = compiler.BasicAnd(result, rhs)
+			if err != nil {
+				return result, err
+			}
+			continue
+		case "|":
+			result, err = compiler.BasicOr(result, rhs)
+			if err != nil {
+				return result, err
+			}
+			continue
+		}
+
+		if result.Equals(Integer) {
+			switch s := symbol.String(); s {
+			case "+", "*", "-", "%":
+				result, err = compiler.BasicOperation(s, result, rhs)
 				if err != nil {
 					return result, err
 				}
 				continue
-			}
-			if equal(symbol, "/") {
-				result, err = compiler.BasicDivide(result, rhs)
+
+			case "!":
+				result, err = compiler.BasicOperation("!=", result, rhs)
 				if err != nil {
 					return result, err
 				}
 				continue
-			}
-			if equal(symbol, "-") {
-				result, err = compiler.BasicSubtract(result, rhs)
+
+			case "^":
+				result, err = compiler.Pow(result, rhs)
+				if err != nil {
+					return result, err
+				}
+				continue
+			case "/":
+				result, err = compiler.Divide(result, rhs)
 				if err != nil {
 					return result, err
 				}

@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"bytes"
 	"errors"
 )
 
@@ -89,54 +90,66 @@ var errorConceptHasNoReturns = errors.New("function does not return any values a
 //CallConcept calls a concept with the specified name.
 func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Expression) (Expression, error) {
 
-	//Simple case. A function with an unknown return value.
-	compiler.PushScope()
-	compiler.GainScope()
+	if compiler.Functions == nil {
+		compiler.Functions = make(map[string]struct{})
+	}
 
-	var buffer = compiler.FlipBuffer()
+	var returns *Type
 
-	for i, argument := range arguments {
-		if concept.Arguments[i].Variadic {
-			compiler.SetVariable(concept.Arguments[i].Token, argument.Type.Collection(Variadic))
-			break
+	if _, ok := compiler.Functions[concept.Name.String()]; !ok {
+
+		//Simple case. A function with an unknown return value.
+		compiler.PushScope()
+		compiler.GainScope()
+
+		compiler.FlipBuffer()
+
+		for i, argument := range arguments {
+			if concept.Arguments[i].Variadic {
+				compiler.SetVariable(concept.Arguments[i].Token, argument.Type.Collection(Variadic))
+				break
+			}
+			compiler.SetVariable(concept.Arguments[i].Token, argument.Type)
 		}
-		compiler.SetVariable(concept.Arguments[i].Token, argument.Type)
-	}
 
-	var context Context
-	context.Returns = &Type{}
-	var returns = context.Returns
+		var context Context
+		context.Returns = &Type{}
+		returns = context.Returns
 
-	if err := compiler.CompileCacheWithContext(concept.Cache, context); err != nil {
-		return Expression{}, err
-	}
-
-	compiler.PopScope()
-
-	//Build function definition.
-	buffer.Head.WriteString("func ")
-	buffer.Head.Write(concept.Name)
-	buffer.Head.WriteString("(")
-
-	for i, argument := range concept.Arguments {
-		buffer.Head.Write(argument.Token)
-		buffer.Head.WriteString(" ")
-		if concept.Arguments[i].Variadic {
-			buffer.Head.WriteString("...")
+		if err := compiler.CompileCacheWithContext(concept.Cache, context); err != nil {
+			return Expression{}, err
 		}
-		buffer.Head.Write(GoTypeOf(arguments[i].Type))
-		if i < len(arguments)-1 {
-			buffer.Head.WriteString(",")
+
+		compiler.PopScope()
+
+		var FunctionHeader bytes.Buffer
+
+		//Build function definition.
+		FunctionHeader.WriteString("func ")
+		FunctionHeader.Write(concept.Name)
+		FunctionHeader.WriteString("(")
+
+		for i, argument := range concept.Arguments {
+			FunctionHeader.Write(argument.Token)
+			FunctionHeader.WriteString(" ")
+			if concept.Arguments[i].Variadic {
+				FunctionHeader.WriteString("...")
+			}
+			FunctionHeader.Write(GoTypeOf(arguments[i].Type))
+			if i < len(arguments)-1 {
+				FunctionHeader.WriteString(",")
+			}
 		}
-	}
 
-	buffer.Head.WriteString(")")
-	if returns != nil && Defined(*returns) {
-		buffer.Head.Write(GoTypeOf(*returns))
-	}
-	buffer.Head.WriteString("{\n")
+		FunctionHeader.WriteString(")")
+		if returns != nil && Defined(*returns) {
+			FunctionHeader.Write(GoTypeOf(*returns))
+		}
+		FunctionHeader.WriteString("{\n")
 
-	compiler.DumpBufferHead()
+		compiler.DumpBufferHead(FunctionHeader.Bytes())
+	}
+	compiler.Functions[concept.Name.String()] = struct{}{}
 
 	var expression Expression
 	if returns != nil {

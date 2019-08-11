@@ -8,6 +8,7 @@ type Field struct {
 	Name     string
 	Type     Type
 	Embedded bool
+	Exported bool
 }
 
 //Type is a 'i' type.
@@ -22,7 +23,7 @@ type Type struct {
 	//Is this type a share?
 	Share bool
 
-	//The relative value of this type.
+	//The relative purchase value of this type.
 	Value int
 
 	Fields []Field
@@ -49,8 +50,11 @@ var Array = Type{Name: "array"}
 //Variadic is a dynamic-length sequence of values.
 var Variadic = Type{Name: "variadic"}
 
+//Bit is a type that can represent 2 values.
+var Bit = Type{Name: "bit"}
+
 //Types is a slice of all 'i' types.
-var Types = []Type{String, Integer, Symbol, Array, List, Byte, Function, Variadic}
+var Types = []Type{String, Integer, Symbol, Array, List, Byte, Function, Variadic, Bit}
 
 //Is returns true if Type is a collection of type 'collection'.
 func (a Type) Is(collection Type) bool {

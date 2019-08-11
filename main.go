@@ -6,13 +6,76 @@ import (
 	"io"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 
-	"github.com/containous/yaegi/interp"
-	"github.com/containous/yaegi/stdlib"
+	"github.com/cosmos72/gomacro/fast"
+	"github.com/cosmos72/gomacro/imports"
 	"github.com/qlova/viking/compiler"
 )
+
+func init() {
+	imports.Packages["os"].Binds["Stdin"] = reflect.ValueOf(&os.Stdin).Elem()
+}
+
+//Test tests the compiler.
+func Test(compiler compiler.Compiler) (err error) {
+	var buffer bytes.Buffer
+	compiler.WriteTo(&buffer)
+
+	/*out := SandBox(compiler.ProvidedInput, func() {
+		var runtime = interp.New(interp.Options{})
+		runtime.Use(stdlib.Symbols)
+		_, err = runtime.Eval(buffer.String())
+	})
+	if len(out) == 0 || err != nil {*/
+	var runtime = fast.New()
+	runtime.ChangePackage("main", "")
+	runtime.Eval(strings.Replace(buffer.String(), "package main", "", 1))
+	out := SandBox(compiler.ProvidedInput, func() {
+		func() {
+			defer func() {
+				recover()
+			}()
+			runtime.Eval("std_in = bufio.NewReader(os.Stdin)")
+		}()
+		runtime.Eval("main()")
+	})
+	//}
+
+	if !bytes.Equal(out, compiler.ExpectedOutput) {
+		fmt.Print("Expecting '", strings.Replace(string(compiler.ExpectedOutput), "\n", `\n`, -1),
+			"' but got '", strings.Replace(string(out), "\n", `\n`, -1), "'\n")
+		os.Exit(1)
+	}
+
+	return nil
+}
+
+//Run runs the compiler.
+func Run(compiler compiler.Compiler) (err error) {
+	var buffer bytes.Buffer
+	compiler.WriteTo(&buffer)
+
+	/*out := SandBox(compiler.ProvidedInput, func() {
+		var runtime = interp.New(interp.Options{})
+		runtime.Use(stdlib.Symbols)
+		_, err = runtime.Eval(buffer.String())
+	})
+	if len(out) == 0 || err != nil {*/
+	var runtime = fast.New()
+	runtime.ChangePackage("main", "")
+	runtime.Eval(strings.Replace(buffer.String(), "package main", "", 1))
+	out := SandBox(nil, func() {
+		runtime.Eval("main()")
+	})
+	//}
+
+	_, err = os.Stdout.Write(out)
+
+	return
+}
 
 func SandBox(input []byte, f func()) []byte {
 	reader, writer, err := os.Pipe()
@@ -36,13 +99,18 @@ func SandBox(input []byte, f func()) []byte {
 	}()
 	os.Stdout = writer
 	os.Stderr = writer
-	os.Stdin = stdinreader
+	if input != nil {
+		os.Stdin = stdinreader
+	}
 	log.SetOutput(writer)
 	out := make(chan []byte)
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 	go func() {
 		wg.Done()
+		if input == nil {
+			return
+		}
 		stdinwriter.Write(input)
 	}()
 	go func() {
@@ -92,23 +160,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		var buffer bytes.Buffer
-		c.WriteTo(&buffer)
-
-		out := SandBox(c.ProvidedInput, func() {
-			var runtime = interp.New(interp.Options{})
-			runtime.Use(stdlib.Symbols)
-			_, err = runtime.Eval(buffer.String())
-			if err != nil {
-				fmt.Fprint(os.Stderr, err)
-			}
-		})
-
-		if !bytes.Equal(out, c.ExpectedOutput) {
-			fmt.Print("Expecting '", strings.Replace(string(c.ExpectedOutput), "\n", `\n`, -1),
-				"' but got '", strings.Replace(string(out), "\n", `\n`, -1), "'\n")
-			os.Exit(1)
-		}
+		Test(c)
 
 		//os.Exit(0)
 
@@ -160,16 +212,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		var buffer bytes.Buffer
-		c.WriteTo(&buffer)
-
-		var runtime = interp.New(interp.Options{})
-		runtime.Use(stdlib.Symbols)
-		_, err = runtime.Eval(buffer.String())
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		Run(c)
 
 	default:
 		fmt.Println("[usage] viking [build] path/to/package")

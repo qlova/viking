@@ -15,6 +15,9 @@ type Error struct {
 func (err Error) Error() string {
 	var compiler = err.compiler
 	var RestOfTheLine, _ = compiler.Reader.ReadString('\n')
+	if compiler.NextToken != nil {
+		RestOfTheLine = compiler.NextToken.String() + RestOfTheLine
+	}
 	return fmt.Sprint(compiler.LineNumber, ": ", string(compiler.Line), RestOfTheLine, "\n", strings.Repeat(" ", compiler.Column+3), "^\n", err.err.Error())
 }
 

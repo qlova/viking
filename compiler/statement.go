@@ -66,6 +66,33 @@ func (compiler *Compiler) CompileStatement() error {
 		compiler.GainScope()
 		return compiler.CompileBlock()
 
+	case "if":
+		var condition, err = compiler.ScanExpression()
+		if err != nil {
+			return err
+		}
+
+		if !condition.Equals(Bit) {
+			condition, err = compiler.Cast(condition, Bit)
+			if err != nil {
+				return err
+			}
+		}
+		compiler.Indent()
+		compiler.WriteString("if ")
+		compiler.Write(condition.Bytes())
+		compiler.WriteString(" {")
+
+		compiler.GainScope()
+		return compiler.CompileBlock()
+
+	case "|":
+		compiler.LoseScope()
+		compiler.Indent()
+		compiler.WriteString("} else {")
+		compiler.GainScope()
+		return compiler.CompileBlock()
+
 	case "for":
 		var name = compiler.Scan()
 
@@ -78,7 +105,7 @@ func (compiler *Compiler) CompileStatement() error {
 			return err
 		}
 
-		if !collection.Is(Variadic) {
+		if !collection.Is(Variadic) && !collection.Is(List) {
 			return errors.New("unimplemented for loop for " + collection.Type.Name)
 		}
 
@@ -97,7 +124,12 @@ func (compiler *Compiler) CompileStatement() error {
 
 	//Return statement.
 	case "return":
+		compiler.Indent()
 		compiler.WriteString("return ")
+
+		if compiler.Peek().Is("\n") {
+			return nil
+		}
 
 		expression, err := compiler.ScanExpression()
 		if err != nil {

@@ -4,7 +4,7 @@ import "bytes"
 import "errors"
 
 //Builtins is a list of all builtin functions.
-var Builtins = []string{"print", "write", "in"}
+var Builtins = []string{"print", "out", "in", "copy"}
 
 //Builtin returns true if the builtin exists.
 func Builtin(check Token) bool {
@@ -21,6 +21,31 @@ func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
 	var expression Expression
 
 	switch builtin.String() {
+	case "copy":
+		if !compiler.ScanIf('(') {
+			return Expression{}, compiler.Expecting('(')
+		}
+		var argument, err = compiler.ScanExpression()
+		if err != nil {
+			return Expression{}, err
+		}
+		if !compiler.ScanIf(')') {
+			return Expression{}, compiler.Expecting(')')
+		}
+
+		expression.Type = argument.Type
+
+		if argument.Is(List) {
+			expression.WriteString("append(")
+			expression.Write(argument.Bytes())
+			expression.WriteString("[:0:0]")
+			expression.WriteString(",")
+			expression.Write(argument.Bytes())
+			expression.WriteString("...)")
+			return expression, nil
+		}
+
+		return Expression{}, Unimplemented(s("copy for " + argument.Type.Name))
 	case "in":
 		if !compiler.ScanIf('(') {
 			return Expression{}, compiler.Expecting('(')
@@ -62,37 +87,54 @@ func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
 }
 
 //CompileBuiltin compiles a call to a builtin.
-func (compiler *Compiler) CompileBuiltin(builtin []byte) error {
-	if bytes.Equal(builtin, []byte("print")) || bytes.Equal(builtin, []byte("write")) {
+func (compiler *Compiler) CompileBuiltin(builtin Token) error {
+	if builtin.Is("print") || builtin.Is("out") {
 
 		if !compiler.ScanIf('(') {
 			return compiler.Unexpected()
 		}
 
-		var expression, err = compiler.ScanExpression()
+		var Arguments []Expression
+
+		var first, err = compiler.ScanExpression()
 		if err != nil {
 			return err
 		}
+		Arguments = append(Arguments, first)
+
+		for compiler.ScanIf(',') {
+			var arg, err = compiler.ScanExpression()
+			if err != nil {
+				return err
+			}
+			Arguments = append(Arguments, arg)
+		}
 
 		if !compiler.ScanIf(')') {
-			return compiler.Unexpected()
+			return compiler.Expecting(')')
 		}
 
 		compiler.Import("fmt")
 
-		if bytes.Equal(builtin, []byte("write")) {
+		if bytes.Equal(builtin, []byte("out")) {
 			compiler.Write([]byte("fmt.Print("))
 		} else {
 			compiler.Write([]byte("fmt.Println("))
 		}
 
-		if expression.Type.Equals(Symbol) {
-			compiler.Write([]byte("string("))
-			compiler.Write(expression.Bytes())
-			compiler.Write([]byte(")"))
-		} else {
-			compiler.Write(expression.Bytes())
+		for i, argument := range Arguments {
+			if argument.Type.Equals(Symbol) {
+				compiler.Write([]byte("string("))
+				compiler.Write(argument.Bytes())
+				compiler.Write([]byte(")"))
+			} else {
+				compiler.Write(argument.Bytes())
+			}
+			if i < len(Arguments)-1 {
+				compiler.WriteString(",")
+			}
 		}
+
 		compiler.Write([]byte(")\n"))
 
 		err = compiler.ScanLine()

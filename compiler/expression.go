@@ -1,9 +1,11 @@
 package compiler
 
-import "io"
-import "bytes"
-import "strconv"
-import "errors"
+import (
+	"bytes"
+	"errors"
+	"io"
+	"strconv"
+)
 
 //Expression is a type with content.
 type Expression struct {
@@ -52,6 +54,22 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 	if token[0] == '\'' {
 		expression.Type = Symbol
 		expression.Write(token)
+		return expression, nil
+	}
+
+	//String expression.
+	if token.Is("(") {
+		var internal, err = compiler.ScanExpression()
+		if err != nil {
+			return internal, err
+		}
+		if !compiler.ScanIf(')') {
+			return internal, compiler.Expecting(')')
+		}
+		expression.Type = internal.Type
+		expression.Write(token)
+		expression.Write(internal.Bytes())
+		expression.WriteString(")")
 		return expression, nil
 	}
 
@@ -135,7 +153,6 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 
 	//Is this a builtin call?
 	if Builtin(token) {
-		compiler.Indent()
 		return compiler.CallBuiltin(token)
 	}
 

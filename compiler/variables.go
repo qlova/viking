@@ -15,11 +15,16 @@ func (compiler *Compiler) SetVariable(name []byte, T Type) {
 }
 
 //GetVariable returns the variable with the given name.
-func (compiler *Compiler) GetVariable(name []byte) Type {
+func (compiler *Compiler) GetVariable(name Token) Type {
 	if len(compiler.Scope) <= 0 {
 		return Type{}
 	}
-	return compiler.Scope[len(compiler.Scope)-1].Table[string(name)]
+	for i := len(compiler.Scope) - 1; i >= 0; i-- {
+		if v, ok := compiler.Scope[i].Table[name.String()]; ok {
+			return v
+		}
+	}
+	return Type{}
 }
 
 //DefineVariable defines the variable 'name' with the scanned value.

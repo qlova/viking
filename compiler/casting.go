@@ -2,6 +2,10 @@ package compiler
 
 //Cast from expression to Type 'to'.
 func (compiler *Compiler) Cast(from Expression, to Type) (Expression, error) {
+	if from.Equals(to) {
+		return from, nil
+	}
+
 	var expression Expression
 	expression.Type = to
 
@@ -25,6 +29,16 @@ func (compiler *Compiler) Cast(from Expression, to Type) (Expression, error) {
 }
 `)
 
+			return expression, nil
+		}
+	}
+
+	//Casting to bit.
+	if to.Equals(Bit) {
+		if from.Type.Equals(Integer) {
+			expression.Write([]byte("("))
+			expression.Write(from.Bytes())
+			expression.Write([]byte(" != 0)"))
 			return expression, nil
 		}
 	}

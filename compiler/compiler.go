@@ -25,6 +25,7 @@ type Compiler struct {
 
 	Imports      map[string]struct{}
 	Dependencies map[string]struct{}
+	Functions    map[string]struct{}
 
 	Scope  []Scope
 	Scopes [][]Scope
@@ -103,12 +104,13 @@ func (compiler *Compiler) DumpBuffer() {
 }
 
 //DumpBufferHead collapses the current buffer onto the old one, writing the body onto the head.
-func (compiler *Compiler) DumpBufferHead() {
+func (compiler *Compiler) DumpBufferHead(split []byte) {
 
 	var last = compiler.Buffers[len(compiler.Buffers)-1]
 
 	last.Head.Write(compiler.Head.Bytes())
 	last.Neck.Write(compiler.Neck.Bytes())
+	last.Head.Write(split)
 	last.Head.Write(compiler.Body.Bytes())
 
 	compiler.Buffer = last
@@ -176,7 +178,9 @@ func (compiler *Compiler) Require(code string) {
 	if _, ok := compiler.Dependencies[code]; !ok {
 		compiler.Dependencies[code] = struct{}{}
 
+		compiler.FlipBuffer()
 		compiler.Head.Write([]byte(code))
+		compiler.DumpBuffer()
 	}
 }
 

@@ -123,18 +123,18 @@ func (scanner *Scanner) scan() Token {
 					continue
 				}
 			case '/':
-				b, err := scanner.Reader.Peek(1)
+				b, err := scanner.Reader.Peek(2)
 				if err != nil {
 					return nil
 				}
-				if b[0] == '/' {
+				if b[1] == '/' {
 					break
 				}
 				fallthrough
 
 			//These symbols break a token.
 			case ':', '\n', '(', ')', '{', '}', '[', ']', '.', ',', '$', '#',
-				'+', '-', '*':
+				'+', '-', '*', '%', '=':
 				if len(token) > 0 {
 					return token //This is an endquote.
 				}
