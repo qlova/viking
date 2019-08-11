@@ -156,6 +156,13 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		return compiler.CallBuiltin(token)
 	}
 
+	//Prototype conversion.
+	if T := compiler.GetPrototype(token); T.Defined() {
+		if T.ScanExpression != nil {
+			return T.ScanExpression(compiler)
+		}
+	}
+
 	//Collections, arrays, lists etc.
 	if T := compiler.GetType(token); Defined(T) {
 		var next = compiler.Scan()

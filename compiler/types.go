@@ -13,6 +13,8 @@ type Field struct {
 
 //Type is a 'i' type.
 type Type struct {
+	Prototype
+
 	Name    string
 	Size    int
 	Subtype *Type
@@ -30,28 +32,28 @@ type Type struct {
 }
 
 //String is an immutable sequence of symbols.
-var String = Type{Name: "string"}
+var String = Type{Name: "string", Prototype: Data}
 
 //Symbol is a contextual reference point.
-var Symbol = Type{Name: "symbol"}
+var Symbol = Type{Name: "symbol", Prototype: Data}
 
 //Integer is a positive or negative integer.
-var Integer = Type{Name: "integer"}
+var Integer = Type{Name: "integer", Prototype: Number}
 
 //Byte is a precisional reference point.
-var Byte = Type{Name: "byte"}
+var Byte = Type{Name: "byte", Prototype: Data}
 
 //Function is a code block that can be run with parameters.
-var Function = Type{Name: "function"}
+var Function = Type{Name: "function", Prototype: Instruction}
 
 //Array is a fixed-length sequence of values.
-var Array = Type{Name: "array"}
+var Array = Type{Name: "array", Prototype: Collection}
 
 //Variadic is a dynamic-length sequence of values.
-var Variadic = Type{Name: "variadic"}
+var Variadic = Type{Name: "variadic", Prototype: Collection}
 
 //Bit is a type that can represent 2 values.
-var Bit = Type{Name: "bit"}
+var Bit = Type{Name: "bit", Prototype: Data}
 
 //Types is a slice of all 'i' types.
 var Types = []Type{String, Integer, Symbol, Array, List, Byte, Function, Variadic, Bit}
@@ -122,7 +124,7 @@ func GoTypeOf(t Type) []byte {
 	case "integer":
 		return s("int")
 	case "function":
-		return s("func()")
+		return s("func(*Context)")
 	case "symbol":
 		return s("rune")
 	}

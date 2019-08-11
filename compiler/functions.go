@@ -19,7 +19,7 @@ func (compiler *Compiler) CallFunction(name Token) error {
 
 	compiler.Indent()
 	compiler.Write(name)
-	compiler.WriteString("()")
+	compiler.WriteString("(ctx)")
 
 	return nil
 }

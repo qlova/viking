@@ -61,9 +61,20 @@ func (compiler *Compiler) CompileStatement() error {
 
 	//Main statement.
 	case "main":
-		compiler.Write(s("func main() {"))
-
+		compiler.Require(`
+type Error struct {
+	Code int
+	Message string
+}
+		
+type Context struct {
+	Error
+}
+`)
+		compiler.WriteString("func main() {\n")
 		compiler.GainScope()
+		compiler.Indent()
+		compiler.WriteString(`var ctx = new(Context)` + "\n")
 		return compiler.CompileBlock()
 
 	case "if":
@@ -153,6 +164,26 @@ func (compiler *Compiler) CompileStatement() error {
 		compiler.LoseScope()
 		return nil
 
+	case "catch":
+		compiler.Require(`
+func (ctx *Context) Catch() Error {
+	defer func() {
+		ctx.Error.Code = 0
+		ctx.Error.Message = ""
+	}()
+	return ctx.Error
+}
+
+`)
+
+		if err := compiler.CompileStatement(); err != nil {
+			return err
+		}
+		compiler.WriteString("\n")
+		compiler.Indent()
+		compiler.WriteString("if err := ctx.Catch(); err.Code > 0 {")
+		compiler.GainScope()
+		return compiler.CompileBlock()
 	}
 
 	//Is this a builtin call?

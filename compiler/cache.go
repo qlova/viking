@@ -78,7 +78,7 @@ func (compiler *Compiler) CacheBlock() Cache {
 				}
 			} else {
 				switch token.String() {
-				case "for", "if":
+				case "for", "if", "catch", "try":
 					depth++
 				}
 

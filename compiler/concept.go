@@ -127,18 +127,16 @@ func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Ex
 		//Build function definition.
 		FunctionHeader.WriteString("func ")
 		FunctionHeader.Write(concept.Name)
-		FunctionHeader.WriteString("(")
+		FunctionHeader.WriteString("(ctx *Context")
 
 		for i, argument := range concept.Arguments {
+			FunctionHeader.WriteString(",")
 			FunctionHeader.Write(argument.Token)
 			FunctionHeader.WriteString(" ")
 			if concept.Arguments[i].Variadic {
 				FunctionHeader.WriteString("...")
 			}
 			FunctionHeader.Write(GoTypeOf(arguments[i].Type))
-			if i < len(arguments)-1 {
-				FunctionHeader.WriteString(",")
-			}
 		}
 
 		FunctionHeader.WriteString(")")
@@ -156,12 +154,10 @@ func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Ex
 		expression.Type = *returns
 	}
 	expression.Write(concept.Name)
-	expression.WriteString("(")
-	for i, argument := range arguments {
+	expression.WriteString("(ctx")
+	for _, argument := range arguments {
+		expression.WriteString(",")
 		expression.Write(argument.Bytes())
-		if i != len(arguments)-1 {
-			expression.WriteString(",")
-		}
 	}
 	expression.WriteString(")")
 

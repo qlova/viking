@@ -4,7 +4,16 @@ import "bytes"
 import "errors"
 
 //Builtins is a list of all builtin functions.
-var Builtins = []string{"print", "out", "in", "copy"}
+var Builtins = []string{"print", "out", "in", "copy", "throw"}
+
+//Throw builtin.
+const Throw = `func (ctx *Context) Throw(code int, msg string) {
+	ctx.Error = Error{
+		Code: code,
+		Message: msg,
+	}
+}
+`
 
 //Builtin returns true if the builtin exists.
 func Builtin(check Token) bool {
