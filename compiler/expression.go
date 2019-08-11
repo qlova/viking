@@ -117,12 +117,12 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 	if token.Is("#") {
 		expression.Type = Integer
 
-		var collection, err = compiler.ScanExpression()
+		var collection, err = compiler.scanExpression()
 		if err != nil {
 			return Expression{}, err
 		}
 
-		if collection.Is(List) {
+		if collection.Is(List) || collection.Is(String) {
 			expression.WriteString("len(")
 			expression.Write(collection.Bytes())
 			expression.WriteString(")")
