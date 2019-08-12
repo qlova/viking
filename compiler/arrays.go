@@ -1,11 +1,9 @@
 package compiler
 
-import "errors"
-
 //IndexArray indexes the array with the specified index.
 func (compiler *Compiler) IndexArray(array, index Expression) (Expression, error) {
 	if !index.Type.Equals(Integer) {
-		return Expression{}, errors.New("Only integers can be used to index an array! Not " + index.Type.Name)
+		return Expression{}, compiler.NewError("Only integers can be used to index an array! Not " + index.Type.Name)
 	}
 
 	if !compiler.ScanIf(']') {
@@ -37,7 +35,7 @@ func (compiler *Compiler) ModifyArray(array []byte) error {
 		return err
 	}
 	if !index.Type.Equals(Integer) {
-		return errors.New("Only integers can be used to index an array! Not " + index.Type.Name)
+		return compiler.NewError("Only integers can be used to index an array! Not " + index.Type.Name)
 	}
 
 	if !compiler.ScanIf(']') {
@@ -53,7 +51,7 @@ func (compiler *Compiler) ModifyArray(array []byte) error {
 		return err
 	}
 	if !value.Type.Equals(*ArrayType.Subtype) {
-		return errors.New("Type mismatch! " + index.Type.Name)
+		return compiler.NewError("Type mismatch! " + index.Type.Name)
 	}
 
 	compiler.Go.Write(array)

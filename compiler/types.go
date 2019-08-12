@@ -1,6 +1,5 @@
 package compiler
 
-import "errors"
 import "strconv"
 
 //Field is an 'i' type field.
@@ -52,14 +51,11 @@ var Array = Type{Name: "array", Prototype: Collection}
 //Variadic is a dynamic-length sequence of values.
 var Variadic = Type{Name: "variadic", Prototype: Collection}
 
-//Package is a type representing the top level collection in a package.
-var Package = Type{Name: "package", Prototype: Collection}
-
 //Bit is a type that can represent 2 values.
 var Bit = Type{Name: "bit", Prototype: Data}
 
 //Types is a slice of all 'i' types.
-var Types = []Type{String, Integer, Symbol, Array, List, Byte, Function, Variadic, Bit, Package}
+var Types = []Type{String, Integer, Symbol, Array, List, Byte, Function, Variadic, Bit}
 
 //Is returns true if Type is a collection of type 'collection'.
 func (a Type) Is(collection Type) bool {
@@ -112,7 +108,7 @@ func (compiler *Compiler) Type(t Type) (Expression, error) {
 		expression.Go.Write([]byte("int(0)"))
 	}
 
-	return Expression{}, errors.New("Invalid type")
+	return Expression{}, compiler.NewError("Invalid type")
 }
 
 //GoTypeOf returns the go type of the Type.
@@ -176,7 +172,7 @@ func (compiler *Compiler) Collection(t Type, subtype Type) (Expression, error) {
 	case "array":
 		size, err := strconv.Atoi(string(index.Go.Bytes()))
 		if err != nil {
-			return Expression{}, errors.New("Invalid array size " + strconv.Itoa(size))
+			return Expression{}, compiler.NewError("Invalid array size " + strconv.Itoa(size))
 		}
 
 		_ = other.Go.String()
@@ -187,5 +183,5 @@ func (compiler *Compiler) Collection(t Type, subtype Type) (Expression, error) {
 		return expression, nil
 	}
 
-	return Expression{}, errors.New("Invalid type")
+	return Expression{}, compiler.NewError("Invalid type")
 }

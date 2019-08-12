@@ -1,9 +1,5 @@
 package compiler
 
-import (
-	"errors"
-)
-
 //Precedence returns i's precedence for the specified symbol.
 func Precedence(symbol []byte) int {
 	if symbol == nil {
@@ -155,7 +151,7 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 			}
 		}*/
 
-		return Expression{}, errors.New("Operator " + string(symbol) + " does not apply to " + result.Name)
+		return Expression{}, compiler.NewError("Operator " + string(symbol) + " does not apply to " + result.Name)
 	}
 	return result, nil
 }

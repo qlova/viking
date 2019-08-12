@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -19,24 +18,30 @@ type Compiler struct {
 
 	Target target.Buffer
 
-	Depth  int
-	Depths []int
-
 	ExpectedOutput []byte
 	ProvidedInput  []byte
 
 	Imports      map[string]struct{}
 	Dependencies map[string]struct{}
-	Functions    map[string]struct{}
 
-	Scope  []Scope
-	Scopes [][]Scope
+	Packages map[string]Package
 
 	Frames []Context
 
 	Buffers []target.Buffer
+}
 
-	Concepts map[string]Concept
+//New returns a new initialised compiler.
+func New() Compiler {
+	var c Compiler
+	c.Init()
+	return c
+}
+
+//Init initialises the compiler.
+func (compiler *Compiler) Init() {
+	compiler.Functions = make(map[string]struct{})
+	compiler.Concepts = make(map[string]Concept)
 }
 
 //NewScope creates and returns a new compiler scope.
@@ -121,12 +126,6 @@ func (compiler *Compiler) DumpBufferHead(split []byte) {
 	compiler.Buffer = last
 
 	compiler.Buffers = compiler.Buffers[:len(compiler.Buffers)-1]
-}
-
-//GainScope gains a new scope level.
-func (compiler *Compiler) GainScope() {
-	compiler.Depth++
-	compiler.Scope = append(compiler.Scope, NewScope())
 }
 
 //LoseScope loses a scope level.
@@ -214,14 +213,14 @@ func (compiler *Compiler) ScanLine() error {
 		compiler.Go.Write(token)
 		return nil
 	}
-	return errors.New("newline expected but found: " + string(token))
+	return compiler.NewError("newline expected but found: " + string(token))
 }
 
 //Compile package located at Compiler.Dir or current working directory if empty.
 func (compiler *Compiler) Compile() error {
 	files, err := ioutil.ReadDir(compiler.Directory)
 	if err != nil {
-		return Error{compiler, err}
+		return err
 	}
 
 	compiler.Go.Head.Write([]byte("package main\n\n"))
@@ -230,7 +229,7 @@ func (compiler *Compiler) Compile() error {
 		if path.Ext(file.Name()) == ".i" {
 			err := compiler.CompileFile(file.Name())
 			if err != nil {
-				return Error{compiler, err}
+				return err
 			}
 		}
 	}
@@ -249,7 +248,7 @@ func (compiler *Compiler) CompileBlock() error {
 	}
 
 	if !compiler.ScanIf('\n') {
-		return errors.New("block must start with a newline")
+		return compiler.NewError("block must start with a newline")
 	}
 
 	return nil
@@ -269,7 +268,7 @@ func (compiler *Compiler) CompileFile(location string) error {
 //CompileReader compiles a reader.
 func (compiler *Compiler) CompileReader(reader io.Reader) error {
 	if reader == nil {
-		return errors.New("null reader")
+		return compiler.NewError("null reader")
 	}
 
 	compiler.SetReader(reader)
@@ -288,6 +287,8 @@ func (compiler *Compiler) CompileReader(reader io.Reader) error {
 				}
 
 				continue
+			} else if err == io.EOF {
+				return nil
 			} else {
 				return err
 			}

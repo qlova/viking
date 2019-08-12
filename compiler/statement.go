@@ -2,7 +2,6 @@ package compiler
 
 import (
 	"bytes"
-	"errors"
 	"io"
 )
 
@@ -107,7 +106,7 @@ type Context struct {
 		var name = compiler.Scan()
 
 		if !compiler.Scan().Is("in") {
-			return errors.New("expecting in")
+			return compiler.NewError("expecting in")
 		}
 
 		var collection, err = compiler.ScanExpression()
@@ -116,7 +115,7 @@ type Context struct {
 		}
 
 		if !collection.Is(Variadic) && !collection.Is(List) {
-			return errors.New("unimplemented for loop for " + collection.Type.Name)
+			return compiler.NewError("unimplemented for loop for " + collection.Type.Name)
 		}
 
 		compiler.Indent()
@@ -145,6 +144,7 @@ type Context struct {
 		if err != nil {
 			return err
 		}
+
 		*compiler.Returns = expression.Type
 
 		compiler.Go.Write(expression.Go.Bytes())
@@ -153,7 +153,7 @@ type Context struct {
 	//Close block.
 	case "}":
 		if compiler.Depth == 0 {
-			return compiler.Unexpected()
+			return compiler.NewError("closing block but there are no blocks")
 		}
 
 		compiler.Depth--
@@ -208,7 +208,7 @@ func (ctx *Context) Catch() Error {
 			}
 			return compiler.DefineVariable(token)
 		}
-		return compiler.Unexpected()
+		return compiler.NewError("$ must be followed by =")
 	}
 
 	//Function calls.
@@ -224,7 +224,7 @@ func (ctx *Context) Catch() Error {
 	//Embedded types.
 	if T := compiler.GetType(token); Defined(T) {
 		if !compiler.InsideTypeDefinition {
-			return errors.New("Cannnot embed type here, are you in a type definition?")
+			return compiler.NewError("Cannnot embed type here, are you in a type definition?")
 		}
 
 		//Is this is a collection then there will be a dot.
@@ -238,7 +238,7 @@ func (ctx *Context) Catch() Error {
 				}
 				T = expression.Type
 			} else {
-				return errors.New("No such collection " + string(compiler.LastToken))
+				return compiler.NewError("No such collection " + string(compiler.LastToken))
 			}
 
 		}
@@ -301,5 +301,5 @@ func (ctx *Context) Catch() Error {
 		return compiler.CompileBlock()
 	}
 
-	return Unimplemented(s("statement" + token.String()))
+	return compiler.Undefined(s("statement: " + token.String()))
 }

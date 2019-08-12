@@ -127,7 +127,7 @@ func SandBox(input []byte, f func()) []byte {
 }
 
 func main() {
-	var c compiler.Compiler
+	var c = compiler.New()
 	c.SetTarget(target.Go)
 
 	if len(os.Args) <= 1 {

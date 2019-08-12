@@ -1,8 +1,6 @@
 package compiler
 
-import (
-	"errors"
-)
+import "fmt"
 
 //Concept is a generic functions.
 type Concept struct {
@@ -17,7 +15,7 @@ func (compiler *Compiler) RunConcept(name Token) error {
 	compiler.Indent()
 	compiler.Go.Write(expression.Go.Bytes())
 
-	if err == errorConceptHasNoReturns {
+	if CompilerErr, ok := err.(Error); ok && CompilerErr.Message == errorConceptHasNoReturns {
 		return nil
 	}
 
@@ -29,7 +27,7 @@ func (compiler *Compiler) CallConcept(name Token) (Expression, error) {
 
 	var concept, ok = compiler.Concepts[name.String()]
 	if !ok {
-		return Expression{}, errors.New(name.String() + " is not a concept")
+		return Expression{}, compiler.NewError(name.String() + " is not a concept")
 	}
 
 	if !compiler.ScanIf('(') {
@@ -49,13 +47,14 @@ func (compiler *Compiler) CallConcept(name Token) (Expression, error) {
 
 		var expression, err = compiler.ScanExpression()
 		if err != nil {
+			fmt.Println("hmm, ", err)
 			return Expression{}, err
 		}
 
 		if Defined(argument.Type) && !expression.Equals(argument.Type) {
 			expression, err = compiler.Cast(expression, argument.Type)
 			if err != nil {
-				return Expression{}, errors.New("type mismatch got type " + expression.Type.Name + " expecting type " + argument.Type.Name)
+				return Expression{}, compiler.NewError("type mismatch got type " + expression.Type.Name + " expecting type " + argument.Type.Name)
 			}
 		}
 
@@ -88,7 +87,7 @@ func (compiler *Compiler) CallConcept(name Token) (Expression, error) {
 	return compiler.generateAndCallConcept(concept, Arguments)
 }
 
-var errorConceptHasNoReturns = errors.New("function does not return any values and cannot be used in an expression")
+var errorConceptHasNoReturns = "function does not return any values and cannot be used in an expression"
 
 //CallConcept calls a concept with the specified name.
 func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Expression) (Expression, error) {
@@ -97,33 +96,29 @@ func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Ex
 		compiler.Functions = make(map[string]struct{})
 	}
 
-	var returns *Type
+	var returns *Type = new(Type)
 
 	if _, ok := compiler.Functions[concept.Name.String()]; !ok {
 
+		var context = compiler.NewContext()
+		context.Returns = returns
+
 		//Simple case. A function with an unknown return value.
-		compiler.PushScope()
-		compiler.GainScope()
+		context.GainScope()
 
 		compiler.FlipBuffer()
 
 		for i, argument := range arguments {
 			if concept.Arguments[i].Variadic {
-				compiler.SetVariable(concept.Arguments[i].Token, argument.Type.Collection(Variadic))
+				context.SetVariable(concept.Arguments[i].Token, argument.Type.Collection(Variadic))
 				break
 			}
-			compiler.SetVariable(concept.Arguments[i].Token, argument.Type)
+			context.SetVariable(concept.Arguments[i].Token, argument.Type)
 		}
-
-		var context Context
-		context.Returns = &Type{}
-		returns = context.Returns
 
 		if err := compiler.CompileCacheWithContext(concept.Cache, context); err != nil {
 			return Expression{}, err
 		}
-
-		compiler.PopScope()
 
 		var FunctionHeader = compiler.Target
 
@@ -165,7 +160,7 @@ func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Ex
 	expression.Go.WriteString(")")
 
 	if returns == nil || !Defined(*returns) {
-		return expression, errorConceptHasNoReturns
+		return expression, compiler.NewError(errorConceptHasNoReturns)
 	}
 
 	return expression, nil

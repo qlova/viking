@@ -65,7 +65,7 @@ func init() {
 			return expression, nil
 		}
 
-		return other, Unimplemented(s("number()"))
+		return other, compiler.Unimplemented(s("number()"))
 	}
 }
 

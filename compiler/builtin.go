@@ -2,7 +2,6 @@ package compiler
 
 import (
 	"bytes"
-	"errors"
 )
 
 //Builtins is a list of all builtin functions.
@@ -56,7 +55,7 @@ func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
 			return expression, nil
 		}
 
-		return Expression{}, Unimplemented(s("copy for " + argument.Type.Name))
+		return Expression{}, compiler.Unimplemented(s("copy for " + argument.Type.Name))
 	case "in":
 		if !compiler.ScanIf('(') {
 			return Expression{}, compiler.Expecting('(')
@@ -92,9 +91,9 @@ func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
 			return expression, nil
 		}
 
-		return Expression{}, errors.New("invalid type " + expression.Type.Name + " passed to builtin")
+		return Expression{}, compiler.NewError("invalid type " + expression.Type.Name + " passed to builtin")
 	}
-	return Expression{}, errors.New("invalid builtin " + builtin.String())
+	return Expression{}, compiler.NewError("invalid builtin " + builtin.String())
 }
 
 //CompileBuiltin compiles a call to a builtin.
@@ -102,7 +101,7 @@ func (compiler *Compiler) CompileBuiltin(builtin Token) error {
 	if builtin.Is("print") || builtin.Is("out") {
 
 		if !compiler.ScanIf('(') {
-			return compiler.Unexpected()
+			return compiler.Expecting('(')
 		}
 
 		var Arguments []Expression
@@ -156,5 +155,5 @@ func (compiler *Compiler) CompileBuiltin(builtin Token) error {
 		return nil
 	}
 
-	return errors.New(string(builtin) + " is not a builtin")
+	return compiler.NewError(string(builtin) + " is not a builtin")
 }

@@ -63,7 +63,7 @@ func (compiler *Compiler) Cast(from Expression, to Type) (Expression, error) {
 		}
 	}
 
-	return Expression{}, Unimplemented([]byte("casting " + from.Type.Name + " to " + to.Name))
+	return Expression{}, compiler.Unimplemented([]byte("casting " + from.Type.Name + " to " + to.Name))
 }
 
 //ScanCast scans and compiles a cast.
@@ -74,7 +74,7 @@ func (compiler *Compiler) ScanCast(t Type) (Expression, error) {
 	}
 
 	if !compiler.ScanIf(')') {
-		compiler.Unexpected()
+		compiler.Expecting(')')
 	}
 
 	return compiler.Cast(other, t)

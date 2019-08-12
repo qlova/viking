@@ -1,21 +1,17 @@
 package compiler
 
-import (
-	"errors"
-)
-
 //Defined returns true if T is defined.
 func Defined(T Type) bool {
 	return T.Name != ""
 }
 
 //SetVariable sets a new variable.
-func (compiler *Compiler) SetVariable(name []byte, T Type) {
+func (compiler *Context) SetVariable(name []byte, T Type) {
 	compiler.Scope[len(compiler.Scope)-1].Table[string(name)] = T
 }
 
 //GetVariable returns the variable with the given name.
-func (compiler *Compiler) GetVariable(name Token) Type {
+func (compiler *Context) GetVariable(name Token) Type {
 	if len(compiler.Scope) <= 0 {
 		return Type{}
 	}
@@ -41,7 +37,7 @@ func (compiler *Compiler) DefineVariable(name []byte) error {
 	compiler.Go.Write(expression.Go.Bytes())
 
 	if !compiler.ScanIf('\n') {
-		return compiler.Unexpected()
+		return compiler.Expecting('\n')
 	}
 
 	return nil
@@ -56,7 +52,7 @@ func (compiler *Compiler) AssignVariable(name []byte) error {
 		return err
 	}
 	if !expression.Type.Equals(variable) {
-		return errors.New("type mismatch")
+		return compiler.NewError("type mismatch")
 	}
 
 	compiler.SetVariable(name, expression.Type)
@@ -65,7 +61,7 @@ func (compiler *Compiler) AssignVariable(name []byte) error {
 	compiler.Go.Write(expression.Go.Bytes())
 
 	if !compiler.ScanIf('\n') {
-		return compiler.Unexpected()
+		return compiler.Expecting('\n')
 	}
 
 	return nil

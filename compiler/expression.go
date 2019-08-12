@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"errors"
 	"io"
 	"strconv"
 	"viking/compiler/target"
@@ -138,7 +137,7 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 			return expression, nil
 		}
 
-		return Expression{}, errors.New("cannot take the length of " + collection.Type.Name)
+		return Expression{}, compiler.NewError("cannot take the length of " + collection.Type.Name)
 	}
 
 	//Variable expression.
@@ -190,11 +189,11 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 			if Defined(subtype) {
 				return compiler.Collection(collection, subtype)
 			}
-			return Expression{}, errors.New("No such collection " + string(compiler.LastToken))
+			return Expression{}, compiler.NewError("No such collection " + string(compiler.LastToken))
 		}
 
-		return Expression{}, Unimplemented(append(append(token, next...), compiler.Peek()...))
+		return Expression{}, compiler.Unimplemented(append(append(token, next...), compiler.Peek()...))
 	}
 
-	return Expression{}, Unimplemented(token)
+	return Expression{}, compiler.Undefined(token)
 }

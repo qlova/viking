@@ -24,19 +24,23 @@ func (compiler *Compiler) CompileCacheWithContext(cache Cache, context Context) 
 
 	for {
 		err := compiler.CompileStatement()
-		if err == io.EOF {
-
+		if err != nil {
 			//Return to the last frame.
 			if len(compiler.Frames) > 0 {
 				var context = compiler.Frames[len(compiler.Frames)-1]
 				compiler.Context = context
 				compiler.Frames = compiler.Frames[:len(compiler.Frames)-1]
-				return nil
-			}
 
-			return nil
-		} else if err != nil {
-			return err
+				if err != io.EOF {
+					return err
+				}
+
+				return nil
+			} else if err == io.EOF {
+				return nil
+			} else {
+				return err
+			}
 		}
 
 		compiler.Go.Write([]byte("\n"))
@@ -55,25 +59,36 @@ func (compiler *Compiler) CacheBlock() Cache {
 	var depth = 1
 
 	if sort.Is(":") {
+		var column = compiler.Column
+		for {
+			var token = compiler.Scan()
+
+			if token.Is("\n") || token == nil {
+				cache.Write(compiler.LastLine[column:])
+				cache.WriteString("}")
+				break
+			}
+		}
+	} else {
+		if sort.Is("{") {
+			compiler.Scan()
+		}
+
+		cache.LineNumber++
 		for {
 			var token = compiler.Scan()
 
 			if token.Is("\n") {
-				break
+				cache.Write(compiler.LastLine)
 			}
 
-			cache.WriteByte(' ')
-			cache.Write(token)
-			cache.WriteByte(' ')
-		}
-		cache.WriteByte('}')
-	} else {
-		for {
-			var token = compiler.Scan()
-
-			if token.Is("}") {
+			if token.Is("}") || token == nil {
 				depth--
 				if depth == 0 {
+					if len(compiler.Line) > 0 {
+						cache.Write(compiler.Line[:len(compiler.Line)-1])
+					}
+					cache.WriteString("}")
 					break
 				}
 			} else {
@@ -83,12 +98,7 @@ func (compiler *Compiler) CacheBlock() Cache {
 				}
 
 			}
-
-			cache.WriteByte(' ')
-			cache.Write(token)
-			cache.WriteByte(' ')
 		}
-		cache.WriteByte('}')
 	}
 
 	return cache

@@ -3,7 +3,6 @@ package scanner
 
 import (
 	"bufio"
-	"errors"
 	"io"
 	"strconv"
 )
@@ -15,6 +14,7 @@ type Scanner struct {
 	NextToken Token
 	LastToken Token
 
+	LastLine           []byte
 	Line               []byte
 	LineNumber, Column int
 	Filename           string
@@ -29,11 +29,6 @@ func (scanner *Scanner) SetReader(reader io.Reader) {
 func (scanner *Scanner) Peek() Token {
 	scanner.NextToken = scanner.scan()
 	return scanner.NextToken
-}
-
-//Unexpected returns an 'unexpected' error.
-func (scanner *Scanner) Unexpected() error {
-	return errors.New("unexpected " + string(scanner.Peek()))
 }
 
 //ScanIf returns true and scans if the next token matches 'b'
@@ -70,6 +65,7 @@ func (scanner *Scanner) readByte() error {
 	if b == '\n' {
 		scanner.Column = 0
 		scanner.LineNumber++
+		scanner.LastLine = scanner.Line
 		scanner.Line = nil
 	}
 
@@ -91,6 +87,28 @@ func (scanner *Scanner) readString() ([]byte, error) {
 
 		result = append(result, b[0])
 		if b[0] == '"' {
+			break
+		}
+	}
+
+	return result, nil
+}
+
+func (scanner *Scanner) readLine() ([]byte, error) {
+	var result []byte
+
+	for {
+		b, err := scanner.Reader.Peek(1)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := scanner.readByte(); err != nil {
+			return nil, err
+		}
+
+		result = append(result, b[0])
+		if b[0] == '\n' {
 			break
 		}
 	}
@@ -234,7 +252,7 @@ func (scanner *Scanner) scan() Token {
 
 				//Comments
 				if peek[1] == '/' {
-					s, err := scanner.Reader.ReadBytes('\n')
+					s, err := scanner.readLine()
 					if err != nil {
 						return nil
 					}

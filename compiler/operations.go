@@ -1,7 +1,5 @@
 package compiler
 
-import "errors"
-
 //BasicOperation returns 'a [operation] b'
 func (compiler *Compiler) BasicOperation(operation string, a, b Expression) (Expression, error) {
 	var expression = compiler.NewExpression()
@@ -82,7 +80,7 @@ func (compiler *Compiler) Mod(a, b Expression) (Expression, error) {
 //Pow returns a raised to power b
 func (compiler *Compiler) Pow(a, b Expression) (Expression, error) {
 	if !a.Type.Equals(b.Type) {
-		return Expression{}, errors.New("type mismatch")
+		return Expression{}, compiler.NewError("type mismatch")
 	}
 
 	compiler.Import("math")
