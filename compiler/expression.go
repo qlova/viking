@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"io"
+	"os"
 	"strconv"
 	"viking/compiler/target"
 )
@@ -149,13 +150,7 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 
 	//Function calls.
 	if concept, ok := compiler.Concepts[token.String()]; ok {
-		if len(concept.Arguments) == 0 {
-			expression.Type = Function
-			expression.Go.Write(token)
-			return expression, nil
-		}
-
-		return compiler.CallConcept(token)
+		return concept.Call(compiler)
 	}
 
 	//Is this a builtin call?
@@ -193,6 +188,12 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		}
 
 		return Expression{}, compiler.Unimplemented(append(append(token, next...), compiler.Peek()...))
+	}
+
+	if P, err := compiler.GetPackage(token); err == nil {
+		return P.Expression(compiler)
+	} else if !os.IsNotExist(err) {
+		return Expression{}, err
 	}
 
 	return Expression{}, compiler.Undefined(token)

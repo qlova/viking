@@ -27,9 +27,7 @@ func (compiler *Compiler) CompileCacheWithContext(cache Cache, context Context) 
 		if err != nil {
 			//Return to the last frame.
 			if len(compiler.Frames) > 0 {
-				var context = compiler.Frames[len(compiler.Frames)-1]
-				compiler.Context = context
-				compiler.Frames = compiler.Frames[:len(compiler.Frames)-1]
+				compiler.PopContext()
 
 				if err != io.EOF {
 					return err
@@ -82,7 +80,7 @@ func (compiler *Compiler) CacheBlock() Cache {
 				cache.Write(compiler.LastLine)
 			}
 
-			if token.Is("}") || token == nil {
+			if token.Is(":") || token.Is("}") || token == nil {
 				depth--
 				if depth == 0 {
 					if len(compiler.Line) > 0 {
@@ -93,7 +91,7 @@ func (compiler *Compiler) CacheBlock() Cache {
 				}
 			} else {
 				switch token.String() {
-				case "for", "if", "catch", "try":
+				case "for", "if", "catch", "try", "{", "main":
 					depth++
 				}
 

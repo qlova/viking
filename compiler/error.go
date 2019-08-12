@@ -2,6 +2,8 @@ package compiler
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -15,11 +17,18 @@ func (err Error) Error() string {
 }
 
 func (compiler *Compiler) NewError(msg string) error {
-	var RestOfTheLine, _ = compiler.Reader.ReadString('\n')
-	if compiler.NextToken != nil {
-		RestOfTheLine = compiler.NextToken.String() + RestOfTheLine
+	var wdir, _ = os.Getwd()
+
+	var rpath, _ = filepath.Rel(wdir, compiler.Directory)
+
+	if len(rpath) > len(compiler.Directory) {
+		rpath = compiler.Directory
 	}
-	var formatted = fmt.Sprint(compiler.LineNumber, ": ", string(compiler.Line), RestOfTheLine, "\n", strings.Repeat(" ", compiler.Column+2), "^\n", msg)
+
+	var RestOfTheLine, _ = compiler.Reader.ReadString('\n')
+	var formatted = fmt.Sprint(rpath, compiler.Filename, ":",
+		compiler.LineNumber, ": ", string(compiler.Line), RestOfTheLine, "\n",
+		strings.Repeat(" ", compiler.Column+2+len(rpath)+len(compiler.Filename)), "^\n", msg)
 	return Error{formatted, msg}
 }
 

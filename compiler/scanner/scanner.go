@@ -138,6 +138,28 @@ func (scanner *Scanner) readSymbol() ([]byte, error) {
 	return result, nil
 }
 
+func (scanner *Scanner) readLiteral() ([]byte, error) {
+	var result = []byte{'`'}
+
+	for {
+		b, err := scanner.Reader.Peek(1)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := scanner.readByte(); err != nil {
+			return nil, err
+		}
+
+		result = append(result, b[0])
+		if b[0] == '`' {
+			break
+		}
+	}
+
+	return result, nil
+}
+
 func (scanner *Scanner) scan() Token {
 	var token Token
 
@@ -221,6 +243,22 @@ func (scanner *Scanner) scan() Token {
 					return nil
 				}
 				s, err := scanner.readString()
+				if err != nil {
+					return nil
+				}
+
+				return s
+
+			//Literals
+			case '`':
+				if len(token) > 0 {
+					return token //This is an endquote.
+				}
+
+				if err := scanner.readByte(); err != nil {
+					return nil
+				}
+				s, err := scanner.readLiteral()
 				if err != nil {
 					return nil
 				}

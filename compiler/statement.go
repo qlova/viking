@@ -43,12 +43,6 @@ func (compiler *Compiler) CompileStatement() error {
 
 	switch token.String() {
 
-	//Import statement.
-	case "import":
-		var namespace = compiler.Scan()
-		compiler.NewContext()
-		return compiler.CompileFile(string(namespace) + ".i")
-
 	//Export tag.
 	case ".":
 		compiler.Export = true
@@ -76,24 +70,7 @@ type Context struct {
 		return compiler.CompileBlock()
 
 	case "if":
-		var condition, err = compiler.ScanExpression()
-		if err != nil {
-			return err
-		}
-
-		if !condition.Equals(Bit) {
-			condition, err = compiler.Cast(condition, Bit)
-			if err != nil {
-				return err
-			}
-		}
-		compiler.Indent()
-		compiler.Go.WriteString("if ")
-		compiler.Go.Write(condition.Go.Bytes())
-		compiler.Go.WriteString(" {")
-
-		compiler.GainScope()
-		return compiler.CompileBlock()
+		return compiler.ScanIfStatement()
 
 	case "|":
 		compiler.LoseScope()
@@ -217,8 +194,8 @@ func (ctx *Context) Catch() Error {
 	}
 
 	//Concept calls.
-	if _, ok := compiler.Concepts[token.String()]; ok {
-		return compiler.RunConcept(token)
+	if concept, ok := compiler.Concepts[token.String()]; ok {
+		return concept.Run(compiler)
 	}
 
 	//Embedded types.

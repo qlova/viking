@@ -5,11 +5,24 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"viking/compiler/target"
 )
 
 //ReservedWords are not available for use as names.
 var ReservedWords = []string{"if", "for", "return", "break", "go", "in"}
+
+//Set is a string set.
+type Set map[string]struct{}
+
+func (set Set) Get(key string) bool {
+	_, ok := set[key]
+	return ok
+}
+
+func (set Set) Set(key string) {
+	set[key] = struct{}{}
+}
 
 //Compiler is an 'i' compiler.
 type Compiler struct {
@@ -21,8 +34,14 @@ type Compiler struct {
 	ExpectedOutput []byte
 	ProvidedInput  []byte
 
-	Imports      map[string]struct{}
-	Dependencies map[string]struct{}
+	Imports      Set
+	Dependencies Set
+
+	Requirements struct {
+		Head Set
+		Neck Set
+		Tail Set
+	}
 
 	Packages map[string]Package
 
@@ -256,8 +275,14 @@ func (compiler *Compiler) CompileBlock() error {
 
 //CompileFile compiles a file.
 func (compiler *Compiler) CompileFile(location string) error {
-	file, err := os.Open(path.Join(compiler.Directory, location))
+	compiler.Filename = filepath.Base(location)
+
+	file, err := os.Open(location)
 	if err != nil {
+		//Return to the last frame.
+		if len(compiler.Frames) > 0 {
+			compiler.PopContext()
+		}
 		return err
 	}
 	defer file.Close()
@@ -276,17 +301,16 @@ func (compiler *Compiler) CompileReader(reader io.Reader) error {
 	for {
 		err := compiler.CompileStatement()
 		if err != nil {
+
 			//Return to the last frame.
 			if len(compiler.Frames) > 0 {
-				var context = compiler.Frames[len(compiler.Frames)-1]
-				compiler.Context = context
-				compiler.Frames = compiler.Frames[:len(compiler.Frames)-1]
+				compiler.PopContext()
 
 				if err != io.EOF {
 					return err
 				}
 
-				continue
+				return nil
 			} else if err == io.EOF {
 				return nil
 			} else {

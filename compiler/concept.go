@@ -9,9 +9,9 @@ type Concept struct {
 	Cache
 }
 
-//RunConcept runs a concept with the specified name wihout return values.
-func (compiler *Compiler) RunConcept(name Token) error {
-	expression, err := compiler.CallConcept(name)
+//Run runs a concept with the specified name wihout return values.
+func (concept Concept) Run(compiler *Compiler) error {
+	expression, err := concept.Call(compiler)
 	compiler.Indent()
 	compiler.Go.Write(expression.Go.Bytes())
 
@@ -22,14 +22,8 @@ func (compiler *Compiler) RunConcept(name Token) error {
 	return err
 }
 
-//CallConcept runs a concept with the specified name wihout return values.
-func (compiler *Compiler) CallConcept(name Token) (Expression, error) {
-
-	var concept, ok = compiler.Concepts[name.String()]
-	if !ok {
-		return Expression{}, compiler.NewError(name.String() + " is not a concept")
-	}
-
+//Call runs a concept with the specified name wihout return values.
+func (concept Concept) Call(compiler *Compiler) (Expression, error) {
 	if !compiler.ScanIf('(') {
 		return Expression{}, compiler.Expecting('(')
 	}

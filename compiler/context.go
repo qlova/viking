@@ -6,6 +6,7 @@ import "github.com/qlova/viking/compiler/scanner"
 type Token = scanner.Token
 
 //Context contains current context information for the compiler.
+//A new context is created for each file/package being compiled.
 type Context struct {
 	scanner.Scanner
 	Directory string
@@ -36,15 +37,32 @@ func (compiler *Compiler) NewContext() Context {
 	ctx.Returns = &Type{}
 	ctx.Concepts = compiler.Concepts
 	ctx.Functions = compiler.Functions
+	ctx.Directory = compiler.Directory
+	return ctx
+}
+
+//NewPackageContext pushes a new context to the compiler with unique functions and concept maps.
+func (compiler *Compiler) NewPackageContext() Context {
+	var ctx Context
+	ctx.Returns = &Type{}
+	ctx.Concepts = make(map[string]Concept)
+	ctx.Functions = make(map[string]struct{})
+	ctx.Directory = compiler.Directory
 	return ctx
 }
 
 //PushContext pushes the specified context to the compiler.
 func (compiler *Compiler) PushContext(context Context) {
-	var directory = compiler.Directory
 	compiler.Frames = append(compiler.Frames, compiler.Context)
 	compiler.Context = context
-	compiler.Directory = directory
+
+}
+
+//PopContext pops the current context of the compiler and returns the previous context.
+func (compiler *Compiler) PopContext() {
+	var context = compiler.Frames[len(compiler.Frames)-1]
+	compiler.Context = context
+	compiler.Frames = compiler.Frames[:len(compiler.Frames)-1]
 }
 
 //GainScope gains a new scope level.
