@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"viking/compiler/target"
 
 	"github.com/cosmos72/gomacro/fast"
 	"github.com/cosmos72/gomacro/imports"
@@ -127,6 +128,7 @@ func SandBox(input []byte, f func()) []byte {
 
 func main() {
 	var c compiler.Compiler
+	c.SetTarget(target.Go)
 
 	if len(os.Args) <= 1 {
 		fmt.Println("[usage] viking [build/test] path/to/package")

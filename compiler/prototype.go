@@ -57,11 +57,11 @@ func init() {
 }
 `)
 
-			var expression Expression
+			var expression = compiler.NewExpression()
 			expression.Type = Number.Type()
-			expression.WriteString("strconv_aton(ctx,")
-			expression.Write(other.Bytes())
-			expression.WriteString(")")
+			expression.Go.WriteString("strconv_aton(ctx,")
+			expression.Go.Write(other.Go.Bytes())
+			expression.Go.WriteString(")")
 			return expression, nil
 		}
 

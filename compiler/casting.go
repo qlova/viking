@@ -6,21 +6,21 @@ func (compiler *Compiler) Cast(from Expression, to Type) (Expression, error) {
 		return from, nil
 	}
 
-	var expression Expression
+	var expression = compiler.NewExpression()
 	expression.Type = to
 
 	//Casting to integer.
 	if to.Equals(Integer) {
 		if from.Type.Equals(Symbol) {
-			expression.Write([]byte("int("))
-			expression.Write(from.Bytes())
-			expression.Write([]byte(")"))
+			expression.Go.Write([]byte("int("))
+			expression.Go.Write(from.Go.Bytes())
+			expression.Go.Write([]byte(")"))
 			return expression, nil
 		}
 		if from.Type.Equals(String) {
-			expression.WriteString("strconv_atoi(")
-			expression.Write(from.Bytes())
-			expression.WriteString(")")
+			expression.Go.WriteString("strconv_atoi(")
+			expression.Go.Write(from.Go.Bytes())
+			expression.Go.WriteString(")")
 
 			compiler.Import("strconv")
 			compiler.Require(`func strconv_atoi(s string) int {
@@ -36,9 +36,9 @@ func (compiler *Compiler) Cast(from Expression, to Type) (Expression, error) {
 	//Casting to bit.
 	if to.Equals(Bit) {
 		if from.Type.Equals(Integer) {
-			expression.Write([]byte("("))
-			expression.Write(from.Bytes())
-			expression.Write([]byte(" != 0)"))
+			expression.Go.Write([]byte("("))
+			expression.Go.Write(from.Go.Bytes())
+			expression.Go.Write([]byte(" != 0)"))
 			return expression, nil
 		}
 	}
@@ -46,9 +46,9 @@ func (compiler *Compiler) Cast(from Expression, to Type) (Expression, error) {
 	//Casting to symbol.
 	if to.Equals(Symbol) {
 		if from.Type.Equals(Integer) {
-			expression.Write([]byte("rune("))
-			expression.Write(from.Bytes())
-			expression.Write([]byte(")"))
+			expression.Go.Write([]byte("rune("))
+			expression.Go.Write(from.Go.Bytes())
+			expression.Go.Write([]byte(")"))
 			return expression, nil
 		}
 	}
@@ -56,9 +56,9 @@ func (compiler *Compiler) Cast(from Expression, to Type) (Expression, error) {
 	//Casting to String.
 	if to.Equals(String) {
 		if from.Type.Equals(Symbol) {
-			expression.Write([]byte("string("))
-			expression.Write(from.Bytes())
-			expression.Write([]byte(")"))
+			expression.Go.Write([]byte("string("))
+			expression.Go.Write(from.Go.Bytes())
+			expression.Go.Write([]byte(")"))
 			return expression, nil
 		}
 	}

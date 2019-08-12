@@ -12,14 +12,14 @@ func (compiler *Compiler) IndexArray(array, index Expression) (Expression, error
 		return Expression{}, compiler.Expecting(']')
 	}
 
-	var expression Expression
+	var expression = compiler.NewExpression()
 	expression.Type = *array.Subtype
-	expression.Write(array.Bytes())
-	expression.Write(s("["))
-	expression.Write(index.Bytes())
-	expression.Write(s("%len("))
-	expression.Write(array.Bytes())
-	expression.Write(s(")]"))
+	expression.Go.Write(array.Go.Bytes())
+	expression.Go.Write(s("["))
+	expression.Go.Write(index.Go.Bytes())
+	expression.Go.Write(s("%len("))
+	expression.Go.Write(array.Go.Bytes())
+	expression.Go.Write(s(")]"))
 
 	return expression, nil
 }
@@ -56,13 +56,13 @@ func (compiler *Compiler) ModifyArray(array []byte) error {
 		return errors.New("Type mismatch! " + index.Type.Name)
 	}
 
-	compiler.Write(array)
-	compiler.Write(s("["))
-	compiler.Write(index.Bytes())
-	compiler.Write(s("%len("))
-	compiler.Write(array)
-	compiler.Write(s(")] = "))
-	compiler.Write(value.Bytes())
+	compiler.Go.Write(array)
+	compiler.Go.Write(s("["))
+	compiler.Go.Write(index.Go.Bytes())
+	compiler.Go.Write(s("%len("))
+	compiler.Go.Write(array)
+	compiler.Go.Write(s(")] = "))
+	compiler.Go.Write(value.Go.Bytes())
 
 	return nil
 }

@@ -18,8 +18,8 @@ func (compiler *Compiler) CallFunction(name Token) error {
 	}
 
 	compiler.Indent()
-	compiler.Write(name)
-	compiler.WriteString("(ctx)")
+	compiler.Go.Write(name)
+	compiler.Go.WriteString("(ctx)")
 
 	return nil
 }

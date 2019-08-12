@@ -25,7 +25,7 @@ func (compiler *Compiler) CompileStatement() error {
 
 	//Comments.
 	if len(token) > 2 && token[0] == '/' && token[1] == '/' {
-		compiler.Write(token)
+		compiler.Go.Write(token)
 
 		//Special output comment for tests.
 		if len(token) > len("//output: ") && bytes.Equal(token[:len("//output: ")], []byte("//output: ")) {
@@ -48,8 +48,7 @@ func (compiler *Compiler) CompileStatement() error {
 	case "import":
 		var namespace = compiler.Scan()
 		compiler.NewContext()
-		compiler.CompileFile(string(namespace) + ".i")
-		return nil
+		return compiler.CompileFile(string(namespace) + ".i")
 
 	//Export tag.
 	case ".":
@@ -71,10 +70,10 @@ type Context struct {
 	Error
 }
 `)
-		compiler.WriteString("func main() {\n")
+		compiler.Go.WriteString("func main() {\n")
 		compiler.GainScope()
 		compiler.Indent()
-		compiler.WriteString(`var ctx = new(Context)` + "\n")
+		compiler.Go.WriteString(`var ctx = new(Context)` + "\n")
 		return compiler.CompileBlock()
 
 	case "if":
@@ -90,9 +89,9 @@ type Context struct {
 			}
 		}
 		compiler.Indent()
-		compiler.WriteString("if ")
-		compiler.Write(condition.Bytes())
-		compiler.WriteString(" {")
+		compiler.Go.WriteString("if ")
+		compiler.Go.Write(condition.Go.Bytes())
+		compiler.Go.WriteString(" {")
 
 		compiler.GainScope()
 		return compiler.CompileBlock()
@@ -100,7 +99,7 @@ type Context struct {
 	case "|":
 		compiler.LoseScope()
 		compiler.Indent()
-		compiler.WriteString("} else {")
+		compiler.Go.WriteString("} else {")
 		compiler.GainScope()
 		return compiler.CompileBlock()
 
@@ -121,12 +120,12 @@ type Context struct {
 		}
 
 		compiler.Indent()
-		compiler.WriteString("for ")
-		compiler.WriteString("_,")
-		compiler.Write(name)
-		compiler.WriteString(":= range ")
-		compiler.Write(collection.Bytes())
-		compiler.WriteString("{")
+		compiler.Go.WriteString("for ")
+		compiler.Go.WriteString("_,")
+		compiler.Go.Write(name)
+		compiler.Go.WriteString(":= range ")
+		compiler.Go.Write(collection.Go.Bytes())
+		compiler.Go.WriteString("{")
 
 		compiler.GainScope()
 		compiler.SetVariable(name, *collection.Type.Subtype)
@@ -136,7 +135,7 @@ type Context struct {
 	//Return statement.
 	case "return":
 		compiler.Indent()
-		compiler.WriteString("return ")
+		compiler.Go.WriteString("return ")
 
 		if compiler.Peek().Is("\n") {
 			return nil
@@ -148,7 +147,7 @@ type Context struct {
 		}
 		*compiler.Returns = expression.Type
 
-		compiler.Write(expression.Bytes())
+		compiler.Go.Write(expression.Go.Bytes())
 		return nil
 
 	//Close block.
@@ -160,7 +159,7 @@ type Context struct {
 		compiler.Depth--
 		compiler.Indent()
 		compiler.Depth++
-		compiler.Write(s("}"))
+		compiler.Go.Write(s("}"))
 		compiler.LoseScope()
 		return nil
 
@@ -179,9 +178,9 @@ func (ctx *Context) Catch() Error {
 		if err := compiler.CompileStatement(); err != nil {
 			return err
 		}
-		compiler.WriteString("\n")
+		compiler.Go.WriteString("\n")
 		compiler.Indent()
-		compiler.WriteString("if err := ctx.Catch(); err.Code > 0 {")
+		compiler.Go.WriteString("if err := ctx.Catch(); err.Code > 0 {")
 		compiler.GainScope()
 		return compiler.CompileBlock()
 	}
@@ -296,7 +295,7 @@ func (ctx *Context) Catch() Error {
 		compiler.TypeName = token
 		compiler.InsideTypeDefinition = true
 
-		compiler.Write(s("func New" + token.String() + "() " + token.String() + " {\n"))
+		compiler.Go.Write(s("func New" + token.String() + "() " + token.String() + " {\n"))
 
 		compiler.GainScope()
 		return compiler.CompileBlock()

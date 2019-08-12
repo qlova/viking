@@ -35,10 +35,10 @@ func (compiler *Compiler) DefineVariable(name []byte) error {
 	}
 
 	compiler.SetVariable(name, expression.Type)
-	compiler.Write([]byte("var "))
-	compiler.Write(name)
-	compiler.Write([]byte(" = "))
-	compiler.Write(expression.Bytes())
+	compiler.Go.Write([]byte("var "))
+	compiler.Go.Write(name)
+	compiler.Go.Write([]byte(" = "))
+	compiler.Go.Write(expression.Go.Bytes())
 
 	if !compiler.ScanIf('\n') {
 		return compiler.Unexpected()
@@ -60,9 +60,9 @@ func (compiler *Compiler) AssignVariable(name []byte) error {
 	}
 
 	compiler.SetVariable(name, expression.Type)
-	compiler.Write(name)
-	compiler.Write([]byte(" = "))
-	compiler.Write(expression.Bytes())
+	compiler.Go.Write(name)
+	compiler.Go.Write([]byte(" = "))
+	compiler.Go.Write(expression.Go.Bytes())
 
 	if !compiler.ScanIf('\n') {
 		return compiler.Unexpected()

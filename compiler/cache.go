@@ -39,7 +39,7 @@ func (compiler *Compiler) CompileCacheWithContext(cache Cache, context Context) 
 			return err
 		}
 
-		compiler.Write([]byte("\n"))
+		compiler.Go.Write([]byte("\n"))
 	}
 }
 

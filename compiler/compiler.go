@@ -1,12 +1,12 @@
 package compiler
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
+	"viking/compiler/target"
 )
 
 //ReservedWords are not available for use as names.
@@ -15,7 +15,9 @@ var ReservedWords = []string{"if", "for", "return", "break", "go", "in"}
 //Compiler is an 'i' compiler.
 type Compiler struct {
 	Context
-	Buffer
+	target.Buffer
+
+	Target target.Buffer
 
 	Depth  int
 	Depths []int
@@ -32,7 +34,7 @@ type Compiler struct {
 
 	Frames []Context
 
-	Buffers []Buffer
+	Buffers []target.Buffer
 
 	Concepts map[string]Concept
 }
@@ -42,6 +44,12 @@ func NewScope() Scope {
 	return Scope{
 		Table: make(map[string]Type),
 	}
+}
+
+//SetTarget sets the compiler target.
+func (compiler *Compiler) SetTarget(target target.Buffer) {
+	compiler.Target = target
+	compiler.Buffer = target
 }
 
 //PushScope pushes a new scopeset to the compiler.
@@ -74,18 +82,13 @@ func (compiler *Compiler) DeferCleanup(f func()) {
 	compiler.Scope[scope].Cleanups = append(compiler.Scope[scope].Cleanups, f)
 }
 
-//Buffer is where the compiler writes data to.
-type Buffer struct {
-	Head, Neck, Body bytes.Buffer
-}
-
 //FlipBuffer creates a new buffer that future writes will write to, returns the old buffer.
-func (compiler *Compiler) FlipBuffer() *Buffer {
+func (compiler *Compiler) FlipBuffer() *target.Buffer {
 	var current = compiler.Buffer
 
 	compiler.Buffers = append(compiler.Buffers, current)
 
-	compiler.Buffer = Buffer{}
+	compiler.Buffer = compiler.Target
 
 	return &compiler.Buffers[len(compiler.Buffers)-1]
 }
@@ -94,9 +97,10 @@ func (compiler *Compiler) FlipBuffer() *Buffer {
 func (compiler *Compiler) DumpBuffer() {
 	var last = compiler.Buffers[len(compiler.Buffers)-1]
 
-	last.Neck.Write(compiler.Neck.Bytes())
-	last.Head.Write(compiler.Head.Bytes())
-	last.Body.Write(compiler.Body.Bytes())
+	last.Go.Head.Write(compiler.Go.Head.Bytes())
+	last.Go.Neck.Write(compiler.Go.Neck.Bytes())
+	last.Go.Write(compiler.Go.Bytes())
+	last.Go.Tail.Write(compiler.Go.Tail.Bytes())
 
 	compiler.Buffer = last
 
@@ -108,10 +112,11 @@ func (compiler *Compiler) DumpBufferHead(split []byte) {
 
 	var last = compiler.Buffers[len(compiler.Buffers)-1]
 
-	last.Head.Write(compiler.Head.Bytes())
-	last.Neck.Write(compiler.Neck.Bytes())
-	last.Head.Write(split)
-	last.Head.Write(compiler.Body.Bytes())
+	last.Go.Head.Write(compiler.Go.Head.Bytes())
+	last.Go.Neck.Write(compiler.Go.Neck.Bytes())
+	last.Go.Neck.Write(split)
+	last.Go.Neck.Write(compiler.Go.Bytes())
+	last.Go.Tail.Write(compiler.Go.Tail.Bytes())
 
 	compiler.Buffer = last
 
@@ -130,19 +135,19 @@ func (compiler *Compiler) LoseScope() {
 	//Cleanup
 	if compiler.InsideTypeDefinition {
 		compiler.Indent()
-		compiler.Write(s("return " + compiler.TypeName.String() + "{}\n"))
+		compiler.Go.Write(s("return " + compiler.TypeName.String() + "{}\n"))
 
 		//We need to create the Go code for this type definition.
 		var T = compiler.TypeDefinition
 
-		compiler.Head.Write(s("type " + compiler.TypeName.String() + " struct {\n"))
-		compiler.Indent(&compiler.Head)
+		compiler.Go.Neck.Write(s("type " + compiler.TypeName.String() + " struct {\n"))
+		compiler.Indent(&compiler.Go.Neck)
 		for _, field := range T.Fields {
-			compiler.Head.Write(s(field.Name + " "))
-			compiler.Head.Write(GoTypeOf(field.Type))
-			compiler.Head.Write(s("\n"))
+			compiler.Go.Neck.Write(s(field.Name + " "))
+			compiler.Go.Neck.Write(GoTypeOf(field.Type))
+			compiler.Go.Neck.Write(s("\n"))
 		}
-		compiler.Head.Write(s("}\n\n"))
+		compiler.Go.Neck.Write(s("}\n\n"))
 
 		compiler.TypeDefinition = Type{}
 	}
@@ -164,8 +169,8 @@ func (compiler *Compiler) Import(pkg string) {
 
 	if _, ok := compiler.Imports[pkg]; !ok {
 		compiler.Imports[pkg] = struct{}{}
-		compiler.Neck.Write([]byte(`import "` + pkg + `"`))
-		compiler.Neck.Write([]byte("\n"))
+		compiler.Go.Head.Write([]byte(`import "` + pkg + `"`))
+		compiler.Go.Head.Write([]byte("\n"))
 	}
 }
 
@@ -179,31 +184,16 @@ func (compiler *Compiler) Require(code string) {
 		compiler.Dependencies[code] = struct{}{}
 
 		compiler.FlipBuffer()
-		compiler.Head.Write([]byte(code))
+		compiler.Go.Neck.Write([]byte(code))
 		compiler.DumpBuffer()
 	}
-}
-
-//Write writes bytes to the body of the compiler output.
-func (buffer *Buffer) Write(data []byte) {
-	buffer.Body.Write(data)
-}
-
-//WriteString writes a string to the body of the compiler output.
-func (buffer *Buffer) WriteString(s string) {
-	buffer.Body.Write([]byte(s))
-}
-
-//WriteLine writes a newline to the body of the compiler's output.
-func (buffer *Buffer) WriteLine() {
-	buffer.Body.Write([]byte{'\n'})
 }
 
 //Indent writes indentation to the body of the compiler's output.
 func (compiler *Compiler) Indent(writers ...io.Writer) {
 	if len(writers) == 0 {
 		for i := 0; i < compiler.Depth; i++ {
-			compiler.Write([]byte{'\t'})
+			compiler.Go.Write([]byte{'\t'})
 		}
 	} else {
 		var writer = writers[0]
@@ -220,8 +210,8 @@ func (compiler *Compiler) ScanLine() error {
 		return nil
 	}
 	if len(token) >= 2 && (token[0] == '/' && token[1] == '/') {
-		compiler.Write(s(" "))
-		compiler.Write(token)
+		compiler.Go.Write(s(" "))
+		compiler.Go.Write(token)
 		return nil
 	}
 	return errors.New("newline expected but found: " + string(token))
@@ -234,7 +224,7 @@ func (compiler *Compiler) Compile() error {
 		return Error{compiler, err}
 	}
 
-	compiler.Neck.Write([]byte("package main\n\n"))
+	compiler.Go.Head.Write([]byte("package main\n\n"))
 
 	for _, file := range files {
 		if path.Ext(file.Name()) == ".i" {
@@ -253,7 +243,7 @@ func (compiler *Compiler) CompileBlock() error {
 	if compiler.ScanIf(':') {
 		defer func() {
 			compiler.LoseScope()
-			compiler.Write([]byte("}"))
+			compiler.Go.Write([]byte("}"))
 		}()
 		return compiler.CompileStatement()
 	}
@@ -278,48 +268,57 @@ func (compiler *Compiler) CompileFile(location string) error {
 
 //CompileReader compiles a reader.
 func (compiler *Compiler) CompileReader(reader io.Reader) error {
+	if reader == nil {
+		return errors.New("null reader")
+	}
+
 	compiler.SetReader(reader)
 
 	for {
 		err := compiler.CompileStatement()
-		if err == io.EOF {
-
+		if err != nil {
 			//Return to the last frame.
 			if len(compiler.Frames) > 0 {
 				var context = compiler.Frames[len(compiler.Frames)-1]
 				compiler.Context = context
 				compiler.Frames = compiler.Frames[:len(compiler.Frames)-1]
-				continue
-			}
 
-			return nil
-		} else if err != nil {
-			return err
+				if err != io.EOF {
+					return err
+				}
+
+				continue
+			} else {
+				return nil
+			}
 		}
 
-		compiler.Write([]byte("\n"))
+		compiler.Go.Write([]byte("\n"))
 	}
 }
 
 //WriteTo writes the compiler's output buffer to the specified buffer.
 func (compiler *Compiler) WriteTo(writer io.Writer) (int64, error) {
-
-	n, err := writer.Write(compiler.Neck.Bytes())
-	if err != nil {
+	var sum int
+	if n, err := writer.Write(compiler.Go.Head.Bytes()); err != nil {
 		return int64(n), err
+	} else {
+		sum += n
 	}
-
-	n2, err := writer.Write(compiler.Head.Bytes())
-	if err != nil {
-		return int64(n2), err
+	if n, err := writer.Write(compiler.Go.Neck.Bytes()); err != nil {
+		return int64(n), err
+	} else {
+		sum += n
 	}
-
-	writer.Write([]byte{'\n'})
-
-	n3, err := writer.Write(compiler.Body.Bytes())
-	if err != nil {
-		return int64(n3), err
+	if n, err := writer.Write(compiler.Go.Bytes()); err != nil {
+		return int64(n), err
+	} else {
+		sum += n
 	}
-
-	return int64(n + n2 + n3), nil
+	if n, err := writer.Write(compiler.Go.Tail.Bytes()); err != nil {
+		return int64(n), err
+	} else {
+		sum += n
+	}
+	return int64(sum), nil
 }

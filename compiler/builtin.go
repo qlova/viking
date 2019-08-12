@@ -27,7 +27,7 @@ func Builtin(check Token) bool {
 
 //CallBuiltin calls a builtin function and returns the resulting expression.
 func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
-	var expression Expression
+	var expression = compiler.NewExpression()
 
 	switch builtin.String() {
 	case "copy":
@@ -45,12 +45,12 @@ func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
 		expression.Type = argument.Type
 
 		if argument.Is(List) {
-			expression.WriteString("append(")
-			expression.Write(argument.Bytes())
-			expression.WriteString("[:0:0]")
-			expression.WriteString(",")
-			expression.Write(argument.Bytes())
-			expression.WriteString("...)")
+			expression.Go.WriteString("append(")
+			expression.Go.Write(argument.Go.Bytes())
+			expression.Go.WriteString("[:0:0]")
+			expression.Go.WriteString(",")
+			expression.Go.Write(argument.Go.Bytes())
+			expression.Go.WriteString("...)")
 			return expression, nil
 		}
 
@@ -71,9 +71,9 @@ func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
 
 		if argument.Equals(Symbol) {
 			expression.Type = String
-			expression.WriteString("in_symbol(")
-			expression.Write(argument.Bytes())
-			expression.WriteString(")")
+			expression.Go.WriteString("in_symbol(")
+			expression.Go.Write(argument.Go.Bytes())
+			expression.Go.WriteString(")")
 
 			compiler.Import("os")
 			compiler.Import("bufio")
@@ -126,25 +126,25 @@ func (compiler *Compiler) CompileBuiltin(builtin Token) error {
 		compiler.Import("fmt")
 
 		if bytes.Equal(builtin, []byte("out")) {
-			compiler.Write([]byte("fmt.Print("))
+			compiler.Go.Write([]byte("fmt.Print("))
 		} else {
-			compiler.Write([]byte("fmt.Println("))
+			compiler.Go.Write([]byte("fmt.Println("))
 		}
 
 		for i, argument := range Arguments {
 			if argument.Type.Equals(Symbol) {
-				compiler.Write([]byte("string("))
-				compiler.Write(argument.Bytes())
-				compiler.Write([]byte(")"))
+				compiler.Go.Write([]byte("string("))
+				compiler.Go.Write(argument.Go.Bytes())
+				compiler.Go.Write([]byte(")"))
 			} else {
-				compiler.Write(argument.Bytes())
+				compiler.Go.Write(argument.Go.Bytes())
 			}
 			if i < len(Arguments)-1 {
-				compiler.WriteString(",")
+				compiler.Go.WriteString(",")
 			}
 		}
 
-		compiler.Write([]byte(")\n"))
+		compiler.Go.Write([]byte(")\n"))
 
 		err = compiler.ScanLine()
 		if err != nil {

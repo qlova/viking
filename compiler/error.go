@@ -18,7 +18,7 @@ func (err Error) Error() string {
 	if compiler.NextToken != nil {
 		RestOfTheLine = compiler.NextToken.String() + RestOfTheLine
 	}
-	return fmt.Sprint(compiler.LineNumber, ": ", string(compiler.Line), RestOfTheLine, "\n", strings.Repeat(" ", compiler.Column+3), "^\n", err.err.Error())
+	return fmt.Sprint(compiler.LineNumber, ": ", string(compiler.Line), RestOfTheLine, "\n", strings.Repeat(" ", compiler.Column+2), "^\n", err.err.Error())
 }
 
 //Unimplemented is an error describing that the component is unimplemented.

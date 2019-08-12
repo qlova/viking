@@ -4,7 +4,7 @@ import "errors"
 
 //BasicOperation returns 'a [operation] b'
 func (compiler *Compiler) BasicOperation(operation string, a, b Expression) (Expression, error) {
-	var expression Expression
+	var expression = compiler.NewExpression()
 	expression.Type = a.Type
 
 	switch operation {
@@ -12,9 +12,9 @@ func (compiler *Compiler) BasicOperation(operation string, a, b Expression) (Exp
 		expression.Type = Bit
 	}
 
-	expression.Write(a.Bytes())
-	expression.Write(s(operation))
-	expression.Write(b.Bytes())
+	expression.Go.Write(a.Go.Bytes())
+	expression.Go.Write(s(operation))
+	expression.Go.Write(b.Go.Bytes())
 
 	return expression, nil
 }
@@ -58,13 +58,13 @@ func (compiler *Compiler) Divide(a, b Expression) (Expression, error) {
 }
 `)
 
-	var expression Expression
+	var expression = compiler.NewExpression()
 	expression.Type = Integer
-	expression.WriteString("div_integer(")
-	expression.Write(a.Bytes())
-	expression.WriteString(",")
-	expression.Write(b.Bytes())
-	expression.WriteString(")")
+	expression.Go.WriteString("div_integer(")
+	expression.Go.Write(a.Go.Bytes())
+	expression.Go.WriteString(",")
+	expression.Go.Write(b.Go.Bytes())
+	expression.Go.WriteString(")")
 
 	return expression, nil
 }
@@ -87,13 +87,13 @@ func (compiler *Compiler) Pow(a, b Expression) (Expression, error) {
 
 	compiler.Import("math")
 
-	var expression Expression
+	var expression = compiler.NewExpression()
 	expression.Type = a.Type
-	expression.WriteString("int(math.Pow(float64(")
-	expression.Write(a.Bytes())
-	expression.WriteString("),float64(")
-	expression.Write(b.Bytes())
-	expression.WriteString(")))")
+	expression.Go.WriteString("int(math.Pow(float64(")
+	expression.Go.Write(a.Go.Bytes())
+	expression.Go.WriteString("),float64(")
+	expression.Go.Write(b.Go.Bytes())
+	expression.Go.WriteString(")))")
 
 	return expression, nil
 }

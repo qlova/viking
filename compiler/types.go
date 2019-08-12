@@ -52,11 +52,14 @@ var Array = Type{Name: "array", Prototype: Collection}
 //Variadic is a dynamic-length sequence of values.
 var Variadic = Type{Name: "variadic", Prototype: Collection}
 
+//Package is a type representing the top level collection in a package.
+var Package = Type{Name: "package", Prototype: Collection}
+
 //Bit is a type that can represent 2 values.
 var Bit = Type{Name: "bit", Prototype: Data}
 
 //Types is a slice of all 'i' types.
-var Types = []Type{String, Integer, Symbol, Array, List, Byte, Function, Variadic, Bit}
+var Types = []Type{String, Integer, Symbol, Array, List, Byte, Function, Variadic, Bit, Package}
 
 //Is returns true if Type is a collection of type 'collection'.
 func (a Type) Is(collection Type) bool {
@@ -101,12 +104,12 @@ func (compiler *Compiler) GetType(name []byte) Type {
 
 //Type returns the type as an expression.
 func (compiler *Compiler) Type(t Type) (Expression, error) {
-	var expression Expression
+	var expression = compiler.NewExpression()
 	expression.Type = t
 
 	switch t.Name {
 	case "integer":
-		expression.Write([]byte("int(0)"))
+		expression.Go.Write([]byte("int(0)"))
 	}
 
 	return Expression{}, errors.New("Invalid type")
@@ -134,13 +137,13 @@ func GoTypeOf(t Type) []byte {
 
 //Collection returns a collection of Type t with the specified subtype.
 func (compiler *Compiler) Collection(t Type, subtype Type) (Expression, error) {
-	var expression Expression
+	var expression = compiler.NewExpression()
 	expression.Type = t
 	expression.Type.Subtype = &subtype
 
 	var next = compiler.Scan()
 
-	var index, other Expression
+	var index, other = compiler.NewExpression(), compiler.NewExpression()
 	var err error
 
 	if next.Is("[") {
@@ -171,16 +174,16 @@ func (compiler *Compiler) Collection(t Type, subtype Type) (Expression, error) {
 
 	switch t.Name {
 	case "array":
-		size, err := strconv.Atoi(string(index.Bytes()))
+		size, err := strconv.Atoi(string(index.Go.Bytes()))
 		if err != nil {
 			return Expression{}, errors.New("Invalid array size " + strconv.Itoa(size))
 		}
 
-		_ = other.String()
+		_ = other.Go.String()
 
 		expression.Size = size
-		expression.Write(GoTypeOf(expression.Type))
-		expression.WriteString("{}")
+		expression.Go.Write(GoTypeOf(expression.Type))
+		expression.Go.WriteString("{}")
 		return expression, nil
 	}
 

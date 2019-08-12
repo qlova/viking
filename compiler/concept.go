@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"bytes"
 	"errors"
 )
 
@@ -16,7 +15,7 @@ type Concept struct {
 func (compiler *Compiler) RunConcept(name Token) error {
 	expression, err := compiler.CallConcept(name)
 	compiler.Indent()
-	compiler.Write(expression.Bytes())
+	compiler.Go.Write(expression.Go.Bytes())
 
 	if err == errorConceptHasNoReturns {
 		return nil
@@ -39,6 +38,10 @@ func (compiler *Compiler) CallConcept(name Token) (Expression, error) {
 
 	var Arguments = make([]Expression, len(concept.Arguments))
 	var extra = false
+
+	for i := range Arguments {
+		Arguments[i] = compiler.NewExpression()
+	}
 
 	for i, argument := range concept.Arguments {
 
@@ -122,44 +125,44 @@ func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Ex
 
 		compiler.PopScope()
 
-		var FunctionHeader bytes.Buffer
+		var FunctionHeader = compiler.Target
 
 		//Build function definition.
-		FunctionHeader.WriteString("func ")
-		FunctionHeader.Write(concept.Name)
-		FunctionHeader.WriteString("(ctx *Context")
+		FunctionHeader.Go.WriteString("func ")
+		FunctionHeader.Go.Write(concept.Name)
+		FunctionHeader.Go.WriteString("(ctx *Context")
 
 		for i, argument := range concept.Arguments {
-			FunctionHeader.WriteString(",")
-			FunctionHeader.Write(argument.Token)
-			FunctionHeader.WriteString(" ")
+			FunctionHeader.Go.WriteString(",")
+			FunctionHeader.Go.Write(argument.Token)
+			FunctionHeader.Go.WriteString(" ")
 			if concept.Arguments[i].Variadic {
-				FunctionHeader.WriteString("...")
+				FunctionHeader.Go.WriteString("...")
 			}
-			FunctionHeader.Write(GoTypeOf(arguments[i].Type))
+			FunctionHeader.Go.Write(GoTypeOf(arguments[i].Type))
 		}
 
-		FunctionHeader.WriteString(")")
+		FunctionHeader.Go.WriteString(")")
 		if returns != nil && Defined(*returns) {
-			FunctionHeader.Write(GoTypeOf(*returns))
+			FunctionHeader.Go.Write(GoTypeOf(*returns))
 		}
-		FunctionHeader.WriteString("{\n")
+		FunctionHeader.Go.WriteString("{\n")
 
-		compiler.DumpBufferHead(FunctionHeader.Bytes())
+		compiler.DumpBufferHead(FunctionHeader.Go.Bytes())
 	}
 	compiler.Functions[concept.Name.String()] = struct{}{}
 
-	var expression Expression
+	var expression = compiler.NewExpression()
 	if returns != nil {
 		expression.Type = *returns
 	}
-	expression.Write(concept.Name)
-	expression.WriteString("(ctx")
+	expression.Go.Write(concept.Name)
+	expression.Go.WriteString("(ctx")
 	for _, argument := range arguments {
-		expression.WriteString(",")
-		expression.Write(argument.Bytes())
+		expression.Go.WriteString(",")
+		expression.Go.Write(argument.Go.Bytes())
 	}
-	expression.WriteString(")")
+	expression.Go.WriteString(")")
 
 	if returns == nil || !Defined(*returns) {
 		return expression, errorConceptHasNoReturns

@@ -1,16 +1,24 @@
 package compiler
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"strconv"
+	"viking/compiler/target"
 )
 
 //Expression is a type with content.
 type Expression struct {
 	Type
-	bytes.Buffer
+	target.Buffer
+}
+
+func (compiler *Compiler) NewExpression() Expression {
+	var expression Expression
+	if compiler.Go.Enabled {
+		expression.Go.Enabled = true
+	}
+	return expression
 }
 
 //ScanExpression returns the next expression or an error.
@@ -24,7 +32,7 @@ func (compiler *Compiler) ScanExpression() (Expression, error) {
 }
 
 func (compiler *Compiler) scanExpression() (Expression, error) {
-	var expression Expression
+	var expression = compiler.NewExpression()
 
 	var token = compiler.Scan()
 
@@ -39,21 +47,21 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 
 	//Ignore comments
 	if len(token) > 2 && token[0] == '/' && token[1] == '/' {
-		compiler.Write(token)
+		compiler.Go.Write(token)
 		return expression, nil
 	}
 
 	//String expression.
 	if token[0] == '"' {
 		expression.Type = String
-		expression.Write(token)
+		expression.Go.Write(token)
 		return expression, nil
 	}
 
 	//Symbol expresion.
 	if token[0] == '\'' {
 		expression.Type = Symbol
-		expression.Write(token)
+		expression.Go.Write(token)
 		return expression, nil
 	}
 
@@ -67,16 +75,16 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 			return internal, compiler.Expecting(')')
 		}
 		expression.Type = internal.Type
-		expression.Write(token)
-		expression.Write(internal.Bytes())
-		expression.WriteString(")")
+		expression.Go.Write(token)
+		expression.Go.Write(internal.Go.Bytes())
+		expression.Go.WriteString(")")
 		return expression, nil
 	}
 
 	//Integer expression.
 	if _, err := strconv.Atoi(string(token)); err == nil {
 		expression.Type = Integer
-		expression.Write(token)
+		expression.Go.Write(token)
 		return expression, nil
 	}
 
@@ -91,24 +99,24 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 
 		expression.Type.Subtype = &first.Type
 
-		expression.Write(GoTypeOf(expression.Type))
-		expression.WriteByte('{')
-		expression.Write(first.Bytes())
+		expression.Go.Write(GoTypeOf(expression.Type))
+		expression.Go.WriteByte('{')
+		expression.Go.Write(first.Go.Bytes())
 
 		for compiler.ScanIf(',') {
-			expression.WriteByte(',')
+			expression.Go.WriteByte(',')
 
 			var item, err = compiler.ScanExpression()
 			if err != nil {
 				return Expression{}, err
 			}
-			expression.Write(item.Bytes())
+			expression.Go.Write(item.Go.Bytes())
 		}
 
 		if !compiler.ScanIf(']') {
 			return Expression{}, compiler.Expecting(']')
 		}
-		expression.WriteByte('}')
+		expression.Go.WriteByte('}')
 
 		return expression, nil
 	}
@@ -123,9 +131,9 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		}
 
 		if collection.Is(List) || collection.Is(String) {
-			expression.WriteString("len(")
-			expression.Write(collection.Bytes())
-			expression.WriteString(")")
+			expression.Go.WriteString("len(")
+			expression.Go.Write(collection.Go.Bytes())
+			expression.Go.WriteString(")")
 
 			return expression, nil
 		}
@@ -136,7 +144,7 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 	//Variable expression.
 	if variable := compiler.GetVariable(token); Defined(variable) {
 		expression.Type = variable
-		expression.Write(token)
+		expression.Go.Write(token)
 		return expression, nil
 	}
 
@@ -144,7 +152,7 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 	if concept, ok := compiler.Concepts[token.String()]; ok {
 		if len(concept.Arguments) == 0 {
 			expression.Type = Function
-			expression.Write(token)
+			expression.Go.Write(token)
 			return expression, nil
 		}
 

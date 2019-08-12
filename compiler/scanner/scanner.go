@@ -50,23 +50,72 @@ func (scanner *Scanner) ScanIf(b byte) bool {
 func (scanner *Scanner) Scan() Token {
 	var token = scanner.scan()
 	scanner.LastToken = token
+	return token
+}
+
+func (scanner *Scanner) readByte() error {
 
 	//Record line numbers, character position and the last line.
+	b, err := scanner.Reader.ReadByte()
 
 	//Line numbers should always start at one.
 	if scanner.LineNumber == 0 {
 		scanner.LineNumber = 1
 	}
 
-	scanner.Column += len(token)
-	scanner.Line = append(scanner.Line, token...)
-	if token.Is("\n") {
+	scanner.Column++
+	scanner.Line = append(scanner.Line, b)
+	if b == '\n' {
 		scanner.Column = 0
 		scanner.LineNumber++
 		scanner.Line = nil
 	}
 
-	return token
+	return err
+}
+
+func (scanner *Scanner) readString() ([]byte, error) {
+	var result = []byte{'"'}
+
+	for {
+		b, err := scanner.Reader.Peek(1)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := scanner.readByte(); err != nil {
+			return nil, err
+		}
+
+		result = append(result, b[0])
+		if b[0] == '"' {
+			break
+		}
+	}
+
+	return result, nil
+}
+
+func (scanner *Scanner) readSymbol() ([]byte, error) {
+	var result = []byte{'\''}
+
+	for {
+		b, err := scanner.Reader.Peek(1)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := scanner.readByte(); err != nil {
+			return nil, err
+		}
+
+		result = append(result, b[0])
+		if b[0] == '\'' {
+			break
+		}
+	}
+
+	return result, nil
 }
 
 func (scanner *Scanner) scan() Token {
@@ -87,8 +136,7 @@ func (scanner *Scanner) scan() Token {
 
 		//Ignore whitespace
 		if peek[0] == ' ' || peek[0] == '\t' {
-			_, err = scanner.Reader.ReadByte()
-			if err != nil {
+			if err := scanner.readByte(); err != nil {
 				return nil
 			}
 			if len(token) > 0 {
@@ -103,8 +151,7 @@ func (scanner *Scanner) scan() Token {
 				if len(token) > 0 {
 
 					if _, err := strconv.Atoi(string(token)); err == nil {
-						_, err = scanner.Reader.ReadByte()
-						if err != nil {
+						if err := scanner.readByte(); err != nil {
 							return nil
 						}
 						token = append(token, peek[0])
@@ -114,8 +161,7 @@ func (scanner *Scanner) scan() Token {
 					}
 				} else {
 
-					_, err = scanner.Reader.ReadByte()
-					if err != nil {
+					if err := scanner.readByte(); err != nil {
 						return nil
 					}
 
@@ -139,8 +185,7 @@ func (scanner *Scanner) scan() Token {
 					return token //This is an endquote.
 				}
 
-				_, err = scanner.Reader.ReadByte()
-				if err != nil {
+				if err := scanner.readByte(); err != nil {
 					return nil
 				}
 
@@ -152,16 +197,15 @@ func (scanner *Scanner) scan() Token {
 					return token //This is an endquote.
 				}
 
-				_, err = scanner.Reader.ReadByte()
-				if err != nil {
+				if err := scanner.readByte(); err != nil {
 					return nil
 				}
-				s, err := scanner.Reader.ReadBytes('"')
+				s, err := scanner.readString()
 				if err != nil {
 					return nil
 				}
 
-				return append(Token{'"'}, s...)
+				return s
 
 			//Symbols
 			case '\'':
@@ -169,16 +213,15 @@ func (scanner *Scanner) scan() Token {
 					return token //This is an endquote.
 				}
 
-				_, err = scanner.Reader.ReadByte()
-				if err != nil {
+				if err := scanner.readByte(); err != nil {
 					return nil
 				}
-				s, err := scanner.Reader.ReadBytes('\'')
+				s, err := scanner.readSymbol()
 				if err != nil {
 					return nil
 				}
 
-				return append(Token{'\''}, s...)
+				return s
 			}
 
 			if peek[0] == '/' {
@@ -198,8 +241,7 @@ func (scanner *Scanner) scan() Token {
 				}
 			}
 
-			_, err = scanner.Reader.ReadByte()
-			if err != nil {
+			if err := scanner.readByte(); err != nil {
 				return nil
 			}
 			token = append(token, peek[0])
