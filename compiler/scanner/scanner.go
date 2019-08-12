@@ -63,8 +63,10 @@ func (scanner *Scanner) readByte() error {
 		scanner.LineNumber = 1
 	}
 
-	scanner.Column++
-	scanner.Line = append(scanner.Line, b)
+	if b != '\t' {
+		scanner.Column++
+		scanner.Line = append(scanner.Line, b)
+	}
 	if b == '\n' {
 		scanner.Column = 0
 		scanner.LineNumber++

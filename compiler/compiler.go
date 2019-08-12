@@ -289,7 +289,7 @@ func (compiler *Compiler) CompileReader(reader io.Reader) error {
 
 				continue
 			} else {
-				return nil
+				return err
 			}
 		}
 

@@ -1,7 +1,9 @@
 package compiler
 
-import "bytes"
-import "errors"
+import (
+	"bytes"
+	"errors"
+)
 
 //Builtins is a list of all builtin functions.
 var Builtins = []string{"print", "out", "in", "copy", "throw"}
