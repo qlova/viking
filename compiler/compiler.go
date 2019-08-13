@@ -1,12 +1,12 @@
 package compiler
 
 import (
+	"github.com/qlova/viking/compiler/target"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
-	"viking/compiler/target"
 )
 
 //ReservedWords are not available for use as names.

@@ -1,10 +1,10 @@
 package compiler
 
 import (
+	"github.com/qlova/viking/compiler/target"
 	"io"
 	"os"
 	"strconv"
-	"viking/compiler/target"
 )
 
 //Expression is a type with content.
