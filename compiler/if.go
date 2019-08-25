@@ -2,7 +2,7 @@ package compiler
 
 import (
 	"bytes"
-	"viking/compiler/target"
+	"github.com/qlova/viking/compiler/target"
 )
 
 func (compiler *Compiler) getTargetBuffer(target *target.Mode, token Token) (*bytes.Buffer, error) {

@@ -3,13 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/qlova/viking/compiler/target"
 	"io"
 	"log"
 	"os"
 	"reflect"
 	"strings"
 	"sync"
-	"viking/compiler/target"
 
 	"github.com/cosmos72/gomacro/fast"
 	"github.com/cosmos72/gomacro/imports"

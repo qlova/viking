@@ -5,7 +5,8 @@ import (
 	"io"
 	"os"
 	"strconv"
-	"viking/compiler/target"
+
+	"github.com/qlova/viking/compiler/target"
 )
 
 //Expression is a type with content.

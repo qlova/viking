@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"viking/compiler/target"
+
+	"github.com/qlova/viking/compiler/target"
 )
 
 //CompileStatement compiles the next statement.

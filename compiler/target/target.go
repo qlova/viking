@@ -5,6 +5,7 @@ import "bytes"
 //Target is a compiler target.
 type Target struct {
 	string
+	name string
 }
 
 func (target Target) Valid() bool {
@@ -13,26 +14,21 @@ func (target Target) Valid() bool {
 
 //Targets is a list of all possible targets.
 var Targets = []Target{
-	Target{"go"},
-	Target{"rs"},
-	Target{"java"},
-	Target{"js"},
-	Target{"cs"},
-	Target{"py"},
-	Target{"lua"},
+	Target{"go", "Go"},
+	Target{"rs", "Rust"},
+	Target{"java", "Java"},
+	Target{"js", "Javascript"},
+	Target{"cs", "CSharp"},
+	Target{"py", "Python"},
+	Target{"lua", "Lua"},
 }
 
 //FromString converts a string to a valid target or empty.
 func FromString(s string) (target Target) {
-	switch s {
-	case "go",
-		"rs",
-		"java",
-		"js",
-		"cs",
-		"py",
-		"lua":
-		target = Target{s}
+	for _, t := range Targets {
+		if t.string == s {
+			return t
+		}
 	}
 	return
 }
