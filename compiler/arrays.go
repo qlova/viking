@@ -42,6 +42,10 @@ func (compiler *Compiler) ModifyArray(array []byte) error {
 		return compiler.Expecting(']')
 	}
 
+	if !compiler.ScanIf('$') {
+		return compiler.Expecting('$')
+	}
+
 	if !compiler.ScanIf('=') {
 		return compiler.Expecting('=')
 	}
