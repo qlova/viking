@@ -1,11 +1,16 @@
 package compiler
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 )
+
+var Trace = os.Getenv("TRACE") != ""
 
 type Error struct {
 	Formatted string
@@ -29,6 +34,25 @@ func (compiler *Compiler) NewError(msg string) error {
 	var formatted = fmt.Sprint(rpath, compiler.Filename, ":",
 		compiler.LineNumber, ": ", string(compiler.Line), RestOfTheLine, "\n",
 		strings.Repeat(" ", compiler.Column+2+len(rpath)+len(compiler.Filename)), "^\n", msg)
+
+	if Trace {
+		var stacktrace = debug.Stack()
+		var reader = bufio.NewReader(bytes.NewBuffer(stacktrace))
+
+		const count = 7
+		for i := 0; i < count; i++ {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				formatted += string(stacktrace)
+				break
+			}
+			if i == count-1 {
+				formatted += "\n(" + strings.TrimSpace(line) + ")\n"
+			}
+		}
+
+	}
+
 	return Error{formatted, msg}
 }
 
