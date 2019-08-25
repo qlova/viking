@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"errors"
 	"io"
 	"os"
 	"strconv"
@@ -150,6 +151,13 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 
 	//Function calls.
 	if concept, ok := compiler.Concepts[token.String()]; ok {
+
+		if !compiler.Peek().Is("(") {
+			expression.Type = Function
+			expression.Go.Write(token)
+			return expression, nil
+		}
+
 		return concept.Call(compiler)
 	}
 
@@ -177,6 +185,31 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		}
 
 		if next.Is(".") {
+
+			//This could be inline target code.
+			if compiler.Peek().Is("if") {
+				compiler.Scan()
+				for {
+					var name = compiler.ScanAndIgnoreNewLines()
+					if t := target.FromString(name.String()); t.Valid() {
+						var code = compiler.ScanAndIgnoreNewLines()
+						if code[0] != '`' {
+							return Expression{}, errors.New("expecting `[target code]`")
+						}
+						expression.Get(t).Write(code[1 : len(code)-1])
+					}
+
+					if name.Is("}") {
+						break
+					}
+					if name == nil {
+						return Expression{}, errors.New("if block wasn't closed")
+					}
+				}
+				expression.Type = T
+				return expression, nil
+			}
+
 			var collection = T
 
 			var subtype = compiler.GetType(compiler.Scan())

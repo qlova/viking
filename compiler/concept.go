@@ -87,12 +87,14 @@ var errorConceptHasNoReturns = "function does not return any values and cannot b
 func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Expression) (Expression, error) {
 
 	if compiler.Functions == nil {
-		compiler.Functions = make(map[string]struct{})
+		compiler.Functions = make(map[string]*Type)
 	}
 
-	var returns *Type = new(Type)
+	var returns = new(Type)
 
-	if _, ok := compiler.Functions[concept.Name.String()]; !ok {
+	if r, ok := compiler.Functions[concept.Name.String()]; ok {
+		returns = r
+	} else if !ok {
 
 		var context = compiler.NewContext()
 		context.Returns = returns
@@ -139,7 +141,7 @@ func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Ex
 
 		compiler.DumpBufferHead(FunctionHeader.Go.Bytes())
 	}
-	compiler.Functions[concept.Name.String()] = struct{}{}
+	compiler.Functions[concept.Name.String()] = returns
 
 	var expression = compiler.NewExpression()
 	if returns != nil {

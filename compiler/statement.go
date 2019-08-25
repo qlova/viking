@@ -3,6 +3,8 @@ package compiler
 import (
 	"bytes"
 	"io"
+	"os"
+	"viking/compiler/target"
 )
 
 //CompileStatement compiles the next statement.
@@ -30,6 +32,9 @@ func (compiler *Compiler) CompileStatement() error {
 		if len(token) > len("//output: ") && bytes.Equal(token[:len("//output: ")], []byte("//output: ")) {
 			compiler.ExpectedOutput = token[len("//output: "):]
 			compiler.ExpectedOutput = bytes.Replace(compiler.ExpectedOutput, []byte(`\n`), []byte("\n"), -1)
+			compiler.ExpectedOutput = bytes.Replace(compiler.ExpectedOutput, []byte(`$HOME`), []byte(os.Getenv("HOME")), -1)
+			compiler.ExpectedOutput = bytes.Replace(compiler.ExpectedOutput, []byte(`$USER`), []byte(os.Getenv("USER")), -1)
+			compiler.ExpectedOutput = bytes.Replace(compiler.ExpectedOutput, []byte(`$PATH`), []byte(os.Getenv("PATH")), -1)
 		}
 
 		//Special output comment for tests.
@@ -160,6 +165,28 @@ func (ctx *Context) Catch() Error {
 		compiler.Go.WriteString("if err := ctx.Catch(); err.Code > 0 {")
 		compiler.GainScope()
 		return compiler.CompileBlock()
+	}
+
+	//Inline target code.
+	if target := target.FromString(token.String()); target.Valid() {
+		if inline := compiler.Peek(); inline[0] == '`' {
+			compiler.Scan()
+			if compiler.ScanIf(';') {
+				var mode = compiler.Scan()
+				switch s := mode.String(); s {
+				case "head":
+					compiler.Get(target).Head.Write(inline[1 : len(inline)-1])
+				default:
+					return compiler.NewError("unsupported tag " + s)
+				}
+				compiler.Get(target).Head.WriteByte('\n')
+			} else {
+				compiler.Get(target).Write(inline[1 : len(inline)-1])
+				compiler.Get(target).WriteByte('\n')
+			}
+			return nil
+		}
+		return compiler.NewError("expecting `[inline code]`")
 	}
 
 	//Is this a builtin call?

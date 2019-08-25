@@ -41,6 +41,14 @@ func (scanner *Scanner) ScanIf(b byte) bool {
 	return false
 }
 
+//ScanAndIgnoreNewLines advances the scanner and returns the next token (ignoring newline characters).
+func (scanner *Scanner) ScanAndIgnoreNewLines() Token {
+	for scanner.ScanIf('\n') {
+
+	}
+	return scanner.Scan()
+}
+
 //Scan advances the scanner and returns the next token.
 func (scanner *Scanner) Scan() Token {
 	var token = scanner.scan()
@@ -48,8 +56,7 @@ func (scanner *Scanner) Scan() Token {
 	return token
 }
 
-func (scanner *Scanner) readByte() error {
-
+func (scanner *Scanner) readByteRaw(ignorespace bool) error {
 	//Record line numbers, character position and the last line.
 	b, err := scanner.Reader.ReadByte()
 
@@ -58,11 +65,11 @@ func (scanner *Scanner) readByte() error {
 		scanner.LineNumber = 1
 	}
 
-	if b != '\t' {
+	if b != '\t' || ignorespace {
 		scanner.Column++
 		scanner.Line = append(scanner.Line, b)
 	}
-	if b == '\n' {
+	if b == '\n' && !ignorespace {
 		scanner.Column = 0
 		scanner.LineNumber++
 		scanner.LastLine = scanner.Line
@@ -70,6 +77,10 @@ func (scanner *Scanner) readByte() error {
 	}
 
 	return err
+}
+
+func (scanner *Scanner) readByte() error {
+	return scanner.readByteRaw(false)
 }
 
 func (scanner *Scanner) readString() ([]byte, error) {
@@ -147,7 +158,7 @@ func (scanner *Scanner) readLiteral() ([]byte, error) {
 			return nil, err
 		}
 
-		if err := scanner.readByte(); err != nil {
+		if err := scanner.readByteRaw(true); err != nil {
 			return nil, err
 		}
 

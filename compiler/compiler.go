@@ -59,7 +59,7 @@ func New() Compiler {
 
 //Init initialises the compiler.
 func (compiler *Compiler) Init() {
-	compiler.Functions = make(map[string]struct{})
+	compiler.Functions = make(map[string]*Type)
 	compiler.Concepts = make(map[string]Concept)
 }
 
@@ -246,7 +246,7 @@ func (compiler *Compiler) Compile() error {
 
 	for _, file := range files {
 		if path.Ext(file.Name()) == ".i" {
-			err := compiler.CompileFile(file.Name())
+			err := compiler.CompileFile(compiler.Directory + "/" + file.Name())
 			if err != nil {
 				return err
 			}
