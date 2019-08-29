@@ -45,6 +45,26 @@ func (compiler *Compiler) CompileCacheWithContext(cache Cache, context Context) 
 	}
 }
 
+//CacheLine creates a cache out of the next 'i' line.
+func (compiler *Compiler) CacheLine() Cache {
+	var cache Cache
+
+	cache.Filename = compiler.Filename
+	cache.LineNumber = compiler.LineNumber
+
+	var column = compiler.Column
+	for {
+		var token = compiler.Scan()
+
+		if token.Is("\n") || token == nil {
+			cache.Write(compiler.LastLine[column : len(compiler.LastLine)-1])
+			break
+		}
+	}
+
+	return cache
+}
+
 //CacheBlock create a cache out of the next 'i' block.
 func (compiler *Compiler) CacheBlock() Cache {
 	var cache Cache

@@ -111,6 +111,9 @@ func (compiler *Compiler) Type(t Type) (Expression, error) {
 	return Expression{}, compiler.NewError("Invalid type")
 }
 
+//Deterministic sets the compiler to produce Deterministic code.
+var Deterministic = true
+
 //GoTypeOf returns the go type of the Type.
 func GoTypeOf(t Type) []byte {
 	switch t.Name {
@@ -121,11 +124,16 @@ func GoTypeOf(t Type) []byte {
 	case "string":
 		return s("string")
 	case "integer":
+		if Deterministic {
+			return s("I.Integer")
+		}
 		return s("int")
 	case "function":
-		return s("func(*Context)")
+		return s("func(I.Context)")
 	case "symbol":
 		return s("rune")
+	case "bit":
+		return s("bool")
 	}
 
 	panic("unimplemented " + t.Name)
@@ -171,6 +179,12 @@ func (compiler *Compiler) Collection(t Type, subtype Type) (Expression, error) {
 	switch t.Name {
 	case "array":
 		size, err := strconv.Atoi(string(index.Go.Bytes()))
+
+		if Deterministic {
+			index := index.Go.String()
+			size, err = strconv.Atoi(index[len("I.NewInteger(") : len(index)-1])
+		}
+
 		if err != nil {
 			return Expression{}, compiler.NewError("Invalid array size " + strconv.Itoa(size))
 		}

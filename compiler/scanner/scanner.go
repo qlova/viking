@@ -4,12 +4,12 @@ package scanner
 import (
 	"bufio"
 	"io"
-	"strconv"
 )
 
 //Scanner is an 'i' token scanner.
 type Scanner struct {
-	Reader *bufio.Reader
+	Reader  *bufio.Reader
+	Readers []*bufio.Reader
 
 	NextToken Token
 	LastToken Token
@@ -20,6 +20,12 @@ type Scanner struct {
 	Filename           string
 }
 
+//PushReader pushes a reader onto the stack.
+func (scanner *Scanner) PushReader(reader io.Reader) {
+	scanner.Readers = append(scanner.Readers, scanner.Reader)
+	scanner.Reader = bufio.NewReader(reader)
+}
+
 //SetReader sets the reader for the scanner.
 func (scanner *Scanner) SetReader(reader io.Reader) {
 	scanner.Reader = bufio.NewReader(reader)
@@ -27,13 +33,22 @@ func (scanner *Scanner) SetReader(reader io.Reader) {
 
 //Peek returns the next token without advancing the scanner.
 func (scanner *Scanner) Peek() Token {
-	scanner.NextToken = scanner.scan()
+	next := scanner.scan()
+	if next == nil {
+		if len(scanner.Readers) > 0 {
+			scanner.Reader = scanner.Readers[len(scanner.Readers)-1]
+			scanner.Readers = scanner.Readers[:len(scanner.Readers)-1]
+			return scanner.Peek()
+		}
+	}
+	scanner.NextToken = next
 	return scanner.NextToken
 }
 
 //ScanIf returns true and scans if the next token matches 'b'
 func (scanner *Scanner) ScanIf(b byte) bool {
 	var peek = scanner.Peek()
+	//fmt.Println("peek", peek)
 	if peek != nil && len(peek) > 0 && peek[0] == b {
 		scanner.Scan()
 		return true
@@ -52,6 +67,14 @@ func (scanner *Scanner) ScanAndIgnoreNewLines() Token {
 //Scan advances the scanner and returns the next token.
 func (scanner *Scanner) Scan() Token {
 	var token = scanner.scan()
+	//fmt.Println("scan", token)
+	if token == nil {
+		if len(scanner.Readers) > 0 {
+			scanner.Reader = scanner.Readers[len(scanner.Readers)-1]
+			scanner.Readers = scanner.Readers[:len(scanner.Readers)-1]
+			return scanner.Scan()
+		}
+	}
 	scanner.LastToken = token
 	return token
 }
@@ -171,6 +194,29 @@ func (scanner *Scanner) readLiteral() ([]byte, error) {
 	return result, nil
 }
 
+func (scanner *Scanner) readNumber() ([]byte, error) {
+	var result = []byte{}
+
+	for {
+		b, err := scanner.Reader.Peek(1)
+		if err != nil {
+			return result, err
+		}
+
+		switch b[0] {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'x':
+		default:
+			return result, nil
+		}
+
+		if err := scanner.readByte(); err != nil {
+			return result, err
+		}
+
+		result = append(result, b[0])
+	}
+}
+
 func (scanner *Scanner) scan() Token {
 	var token Token
 
@@ -184,13 +230,13 @@ func (scanner *Scanner) scan() Token {
 	for {
 		peek, err := scanner.Reader.Peek(1)
 		if err != nil {
-			return nil
+			return token
 		}
 
 		//Ignore whitespace
 		if peek[0] == ' ' || peek[0] == '\t' {
 			if err := scanner.readByte(); err != nil {
-				return nil
+				return token
 			}
 			if len(token) > 0 {
 				return token
@@ -201,30 +247,15 @@ func (scanner *Scanner) scan() Token {
 
 			//Numerics
 			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				if len(token) > 0 {
-
-					if _, err := strconv.Atoi(string(token)); err == nil {
-						if err := scanner.readByte(); err != nil {
-							return nil
-						}
-						token = append(token, peek[0])
-						continue
-					} else {
-						return token
-					}
-				} else {
-
-					if err := scanner.readByte(); err != nil {
-						return nil
-					}
-
-					token = append(token, peek[0])
-					continue
+				s, err := scanner.readNumber()
+				if err != nil {
+					return s
 				}
+				return s
 			case '/':
 				b, err := scanner.Reader.Peek(2)
 				if err != nil {
-					return nil
+					return token
 				}
 				if b[1] == '/' {
 					break
@@ -233,13 +264,13 @@ func (scanner *Scanner) scan() Token {
 
 			//These symbols break a token.
 			case ':', '\n', '(', ')', '{', '}', '[', ']', '.', ',', '$', '#',
-				'+', '-', '*', '%', '=':
+				'+', '-', '*', '%', '=', '|', '^', '&', '!', '?', '<', '>', '~', '_', ';':
 				if len(token) > 0 {
 					return token //This is an endquote.
 				}
 
 				if err := scanner.readByte(); err != nil {
-					return nil
+					return token
 				}
 
 				return Token{peek[0]}
@@ -251,11 +282,11 @@ func (scanner *Scanner) scan() Token {
 				}
 
 				if err := scanner.readByte(); err != nil {
-					return nil
+					return token
 				}
 				s, err := scanner.readString()
 				if err != nil {
-					return nil
+					return token
 				}
 
 				return s
@@ -267,11 +298,11 @@ func (scanner *Scanner) scan() Token {
 				}
 
 				if err := scanner.readByte(); err != nil {
-					return nil
+					return token
 				}
 				s, err := scanner.readLiteral()
 				if err != nil {
-					return nil
+					return token
 				}
 
 				return s
@@ -283,11 +314,11 @@ func (scanner *Scanner) scan() Token {
 				}
 
 				if err := scanner.readByte(); err != nil {
-					return nil
+					return token
 				}
 				s, err := scanner.readSymbol()
 				if err != nil {
-					return nil
+					return token
 				}
 
 				return s
@@ -296,14 +327,14 @@ func (scanner *Scanner) scan() Token {
 			if peek[0] == '/' {
 				peek, err := scanner.Reader.Peek(2)
 				if err != nil {
-					return nil
+					return token
 				}
 
 				//Comments
 				if peek[1] == '/' {
 					s, err := scanner.readLine()
 					if err != nil {
-						return nil
+						return token
 					}
 
 					return s[:len(s)-1]
@@ -311,7 +342,7 @@ func (scanner *Scanner) scan() Token {
 			}
 
 			if err := scanner.readByte(); err != nil {
-				return nil
+				return token
 			}
 			token = append(token, peek[0])
 		}

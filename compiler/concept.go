@@ -1,7 +1,5 @@
 package compiler
 
-import "fmt"
-
 //Concept is a generic functions.
 type Concept struct {
 	Name      Token
@@ -41,7 +39,6 @@ func (concept Concept) Call(compiler *Compiler) (Expression, error) {
 
 		var expression, err = compiler.ScanExpression()
 		if err != nil {
-			fmt.Println("hmm, ", err)
 			return Expression{}, err
 		}
 
@@ -121,7 +118,7 @@ func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Ex
 		//Build function definition.
 		FunctionHeader.Go.WriteString("func ")
 		FunctionHeader.Go.Write(concept.Name)
-		FunctionHeader.Go.WriteString("(ctx *Context")
+		FunctionHeader.Go.WriteString("(ctx I.Context")
 
 		for i, argument := range concept.Arguments {
 			FunctionHeader.Go.WriteString(",")

@@ -6,7 +6,7 @@ func Precedence(symbol []byte) int {
 		return -1
 	}
 	switch string(symbol) {
-	case ",", ")", "]", "\n", "", "}":
+	case ",", ")", "]", "\n", "", "}", "in", ":", ";", "to":
 		return -1
 
 	case "|":
@@ -34,7 +34,7 @@ func Precedence(symbol []byte) int {
 		return 7
 
 	default:
-		return 0
+		return -2
 	}
 }
 
@@ -45,7 +45,7 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 	//shunting:
 	for peek := compiler.Peek(); Precedence(peek) >= precedence; {
 
-		if Precedence(compiler.Peek()) == -1 {
+		if Precedence(compiler.Peek()) <= -1 {
 			break
 		}
 
@@ -55,7 +55,7 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 			break
 		}
 
-		rhs, err := compiler.ScanExpression()
+		rhs, err := compiler.scanExpression()
 		if err != nil {
 			return result, err
 		}
@@ -83,12 +83,27 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 		if result.Equals(String) {
 			switch s := symbol.String(); s {
 			case "+":
-				result, err = compiler.BasicOperation(s, result, rhs)
+				result, err = compiler.BasicConcat(result, rhs)
 				if err != nil {
 					return result, err
 				}
 				continue
 			}
+		}
+
+		if result.Equals(Bit) {
+			switch s := symbol.String(); s {
+			case "-":
+				result, err = compiler.BasicXOr(result, rhs)
+			case "&":
+				result, err = compiler.BasicAnd(result, rhs)
+			case "|":
+				result, err = compiler.BasicOr(result, rhs)
+			}
+			if err != nil {
+				return result, err
+			}
+			continue
 		}
 
 		switch s := symbol.String(); s {
@@ -98,49 +113,35 @@ func (compiler *Compiler) Shunt(e Expression, precedence int) (result Expression
 				return result, err
 			}
 			continue
-		case "&":
-			result, err = compiler.BasicAnd(result, rhs)
-			if err != nil {
-				return result, err
-			}
-			continue
-		case "|":
-			result, err = compiler.BasicOr(result, rhs)
-			if err != nil {
-				return result, err
-			}
-			continue
 		}
 
 		if result.Equals(Integer) {
 			switch s := symbol.String(); s {
-			case "+", "*", "-", "%":
-				result, err = compiler.BasicOperation(s, result, rhs)
-				if err != nil {
-					return result, err
-				}
-				continue
-
+			case "=":
+				result, err = compiler.BasicEquals(result, rhs)
+			case "<":
+				result, err = compiler.BasicLessThan(result, rhs)
+			case ">":
+				result, err = compiler.BasicGreaterThan(result, rhs)
+			case "+":
+				result, err = compiler.BasicAdd(result, rhs)
+			case "*":
+				result, err = compiler.BasicMultiply(result, rhs)
+			case "-":
+				result, err = compiler.BasicSubtract(result, rhs)
+			case "%":
+				result, err = compiler.Mod(result, rhs)
 			case "!":
-				result, err = compiler.BasicOperation("!=", result, rhs)
-				if err != nil {
-					return result, err
-				}
-				continue
-
+				result, err = compiler.BasicNotEquals(result, rhs)
 			case "^":
 				result, err = compiler.Pow(result, rhs)
-				if err != nil {
-					return result, err
-				}
-				continue
 			case "/":
 				result, err = compiler.Divide(result, rhs)
-				if err != nil {
-					return result, err
-				}
-				continue
 			}
+			if err != nil {
+				return result, err
+			}
+			continue
 		}
 
 		//Lets do the shunting!

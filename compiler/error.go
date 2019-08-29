@@ -31,6 +31,7 @@ func (compiler *Compiler) NewError(msg string) error {
 	}
 
 	var RestOfTheLine, _ = compiler.Reader.ReadString('\n')
+
 	var formatted = fmt.Sprint(rpath, compiler.Filename, ":",
 		compiler.LineNumber, ": ", string(compiler.Line), RestOfTheLine, "\n",
 		strings.Repeat(" ", compiler.Column+2+len(rpath)+len(compiler.Filename)), "^\n", msg)
@@ -68,5 +69,5 @@ func (compiler *Compiler) Undefined(name []byte) error {
 
 //Expecting returns an error in the form "expecting [token]"
 func (compiler *Compiler) Expecting(symbol byte) error {
-	return compiler.NewError("expecting " + string(symbol))
+	return compiler.NewError("expecting " + string(symbol) + " but found " + compiler.Scan().String())
 }

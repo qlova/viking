@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"bytes"
+
 	"github.com/qlova/viking/compiler/target"
 )
 
@@ -59,7 +60,6 @@ func (compiler *Compiler) processRequirement(T target.Target, buffer *bytes.Buff
 }
 
 func (compiler *Compiler) ScanIfStatement() error {
-
 	//native code.
 	if compiler.ScanIf('.') {
 
@@ -129,5 +129,60 @@ func (compiler *Compiler) ScanIfStatement() error {
 	compiler.Go.WriteString(" {")
 
 	compiler.GainScope()
-	return compiler.CompileBlock()
+	compiler.SetFlag(s("if"))
+
+	var singleLine = compiler.Peek().Is(":")
+	if err := compiler.CompileBlock(); err != nil {
+		return err
+	}
+
+	if singleLine {
+		compiler.ScanLine()
+	}
+
+	//Continuation elseif or else
+	for {
+		if compiler.ScanIf('|') {
+			if compiler.ScanIf('|') {
+
+				//Standard elseif statement.
+				var condition, err = compiler.ScanExpression()
+				if err != nil {
+					return err
+				}
+
+				if !condition.Equals(Bit) {
+					condition, err = compiler.Cast(condition, Bit)
+					if err != nil {
+						return err
+					}
+				}
+
+				compiler.Indent()
+				compiler.Go.WriteString("else if ")
+				compiler.Go.Write(condition.Go.Bytes())
+				compiler.Go.WriteString(" {")
+				compiler.GainScope()
+				compiler.SetFlag(s("if"))
+				var singleLine = compiler.Peek().Is(":")
+				if err := compiler.CompileBlock(); err != nil {
+					return err
+				}
+				if singleLine {
+					compiler.ScanLine()
+				}
+				continue
+			}
+			compiler.Indent()
+			compiler.Go.WriteString(" else {")
+			compiler.GainScope()
+			if err := compiler.CompileBlock(); err != nil {
+				return err
+			}
+			return nil
+		}
+		break
+	}
+
+	return nil
 }

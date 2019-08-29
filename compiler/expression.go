@@ -34,9 +34,11 @@ func (compiler *Compiler) ScanExpression() (Expression, error) {
 }
 
 func (compiler *Compiler) scanExpression() (Expression, error) {
-	var expression = compiler.NewExpression()
+	return compiler.expression(compiler.Scan())
+}
 
-	var token = compiler.Scan()
+func (compiler *Compiler) expression(token Token) (Expression, error) {
+	var expression = compiler.NewExpression()
 
 	/*switch token {
 		case "if", "for", "return", "break", "go":
@@ -51,6 +53,12 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 	if len(token) > 2 && token[0] == '/' && token[1] == '/' {
 		compiler.Go.Write(token)
 		return expression, nil
+	}
+
+	//Alias expression.
+	if alias, ok := compiler.Aliases[token.String()]; ok {
+		compiler.UnpackAlias(alias)
+		return compiler.expression(compiler.Scan())
 	}
 
 	//String expression.
@@ -83,10 +91,71 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		return expression, nil
 	}
 
+	//Binary number expression.
+	if i, err := strconv.ParseInt(string(token), 2, 64); err == nil && len(token) > 0 && token[0] == '0' {
+		expression.Type = Integer
+		if Deterministic {
+			compiler.Import(Ilang)
+			expression.Go.WriteString("I.NewInteger(")
+		}
+		expression.Go.Write(s(strconv.Itoa(int(i))))
+		if Deterministic {
+			expression.Go.WriteString(")")
+		}
+		return expression, nil
+	}
+
 	//Integer expression.
 	if _, err := strconv.Atoi(string(token)); err == nil {
 		expression.Type = Integer
+		if Deterministic {
+			compiler.Import(Ilang)
+			expression.Go.WriteString("I.NewInteger(")
+		}
 		expression.Go.Write(token)
+		if Deterministic {
+			expression.Go.WriteString(")")
+		}
+		return expression, nil
+	}
+
+	//Hexadecimal expression.
+	if len(token) > 2 && token[0] == '0' && token[1] == 'x' {
+		expression.Type = Integer
+		if Deterministic {
+			compiler.Import(Ilang)
+			expression.Go.WriteString("I.NewInteger(")
+		}
+		expression.Go.Write(token)
+		if Deterministic {
+			expression.Go.WriteString(")")
+		}
+		return expression, nil
+	}
+
+	//Bit expression.
+	if token.Is("true") || token.Is("false") {
+		expression.Type = Bit
+		expression.Go.Write(token)
+		return expression, nil
+	}
+
+	//Not expression.
+	if token.Is("!") {
+
+		var boolean, err = compiler.scanExpression()
+		if err != nil {
+			return Expression{}, err
+		}
+
+		if !boolean.Equals(Bit) {
+			return Expression{}, compiler.NewError("cannot apply not operator to value of type " + boolean.Type.Name)
+		}
+
+		expression.Type = Bit
+		expression.Go.WriteString("(!")
+		expression.Go.Write(boolean.Go.Bytes())
+		expression.Go.WriteString(")")
 		return expression, nil
 	}
 
@@ -133,9 +202,17 @@ func (compiler *Compiler) scanExpression() (Expression, error) {
 		}
 
 		if collection.Is(List) || collection.Is(String) {
+
+			if Deterministic {
+				compiler.Import(Ilang)
+				expression.Go.WriteString("I.NewInteger(")
+			}
 			expression.Go.WriteString("len(")
 			expression.Go.Write(collection.Go.Bytes())
 			expression.Go.WriteString(")")
+			if Deterministic {
+				expression.Go.WriteString(")")
+			}
 
 			return expression, nil
 		}

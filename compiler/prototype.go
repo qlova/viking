@@ -42,10 +42,11 @@ func init() {
 		}
 
 		if other.Equals(String) {
+			compiler.Throws = true
+
 			compiler.Import("strconv")
-			compiler.Require(Throw)
 			compiler.Require(Number.Requirement)
-			compiler.Require(`func strconv_aton(ctx *Context, s string) number {
+			compiler.Require(`func strconv_aton(ctx I.Context, s string) number {
 	if i, err := strconv.Atoi(s); err == nil {
 		return i
 	}

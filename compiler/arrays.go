@@ -14,10 +14,17 @@ func (compiler *Compiler) IndexArray(array, index Expression) (Expression, error
 	expression.Type = *array.Subtype
 	expression.Go.Write(array.Go.Bytes())
 	expression.Go.Write(s("["))
-	expression.Go.Write(index.Go.Bytes())
-	expression.Go.Write(s("%len("))
-	expression.Go.Write(array.Go.Bytes())
-	expression.Go.Write(s(")]"))
+	if Deterministic {
+		compiler.Import(Ilang)
+		expression.Go.Write(s("I.IndexArray("))
+		expression.Go.Write(index.Go.Bytes())
+		expression.Go.Write(s(", len("))
+		expression.Go.Write(array.Go.Bytes())
+		expression.Go.Write(s("))]"))
+	} else {
+		expression.Go.Write(index.Go.Bytes())
+		expression.Go.Write(s("]"))
+	}
 
 	return expression, nil
 }
@@ -60,10 +67,17 @@ func (compiler *Compiler) ModifyArray(array []byte) error {
 
 	compiler.Go.Write(array)
 	compiler.Go.Write(s("["))
-	compiler.Go.Write(index.Go.Bytes())
-	compiler.Go.Write(s("%len("))
-	compiler.Go.Write(array)
-	compiler.Go.Write(s(")] = "))
+
+	if Deterministic {
+		compiler.Go.Write(s("I.IndexArray("))
+		compiler.Go.Write(index.Go.Bytes())
+		compiler.Go.Write(s(", len("))
+		compiler.Go.Write(array)
+		compiler.Go.Write(s("))] = "))
+	} else {
+		compiler.Go.Write(index.Go.Bytes())
+		compiler.Go.Write(s("] = "))
+	}
 	compiler.Go.Write(value.Go.Bytes())
 
 	return nil

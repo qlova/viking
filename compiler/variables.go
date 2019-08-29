@@ -36,10 +36,6 @@ func (compiler *Compiler) DefineVariable(name []byte) error {
 	compiler.Go.Write([]byte(" = "))
 	compiler.Go.Write(expression.Go.Bytes())
 
-	if !compiler.ScanIf('\n') {
-		return compiler.Expecting('\n')
-	}
-
 	return nil
 }
 
@@ -59,10 +55,6 @@ func (compiler *Compiler) AssignVariable(name []byte) error {
 	compiler.Go.Write(name)
 	compiler.Go.Write([]byte(" = "))
 	compiler.Go.Write(expression.Go.Bytes())
-
-	if !compiler.ScanIf('\n') {
-		return compiler.Expecting('\n')
-	}
 
 	return nil
 }

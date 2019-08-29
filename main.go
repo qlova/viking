@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/qlova/viking/compiler/target"
 	"io"
 	"log"
 	"os"
@@ -11,17 +10,27 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/qlova/viking/compiler/target"
+
 	"github.com/cosmos72/gomacro/fast"
 	"github.com/cosmos72/gomacro/imports"
 	"github.com/qlova/viking/compiler"
 )
 
 func init() {
+	imports.Packages.Merge(Packages)
 	imports.Packages["os"].Binds["Stdin"] = reflect.ValueOf(&os.Stdin).Elem()
 }
 
 //Test tests the compiler.
 func Test(compiler compiler.Compiler) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println(r)
+			os.Exit(1)
+		}
+	}()
+
 	var buffer bytes.Buffer
 	compiler.WriteTo(&buffer)
 
@@ -110,9 +119,11 @@ func SandBox(input []byte, f func()) []byte {
 	go func() {
 		wg.Done()
 		if input == nil {
+			stdinwriter.Close()
 			return
 		}
 		stdinwriter.Write(input)
+		stdinwriter.Close()
 	}()
 	go func() {
 		var buf bytes.Buffer

@@ -28,7 +28,12 @@ type Context struct {
 	Scope  []Scope
 	Scopes [][]Scope
 
+	Aliases map[string]Alias
+
 	Returns *Type
+
+	//Does the current statement throw?
+	Throws bool
 }
 
 //NewContext pushes a new context to the compiler.
@@ -37,6 +42,7 @@ func (compiler *Compiler) NewContext() Context {
 	ctx.Returns = &Type{}
 	ctx.Concepts = compiler.Concepts
 	ctx.Functions = compiler.Functions
+	ctx.Aliases = compiler.Aliases
 	ctx.Directory = compiler.Directory
 	return ctx
 }
@@ -47,6 +53,7 @@ func (compiler *Compiler) NewPackageContext() Context {
 	ctx.Returns = &Type{}
 	ctx.Concepts = make(map[string]Concept)
 	ctx.Functions = make(map[string]*Type)
+	ctx.Aliases = make(map[string]Alias)
 	ctx.Directory = compiler.Directory
 	return ctx
 }

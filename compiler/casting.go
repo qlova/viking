@@ -12,19 +12,33 @@ func (compiler *Compiler) Cast(from Expression, to Type) (Expression, error) {
 	//Casting to integer.
 	if to.Equals(Integer) {
 		if from.Type.Equals(Symbol) {
-			expression.Go.Write([]byte("int("))
+			expression.Go.Write([]byte("I.NewInteger(int("))
 			expression.Go.Write(from.Go.Bytes())
-			expression.Go.Write([]byte(")"))
+			expression.Go.Write([]byte("))"))
 			return expression, nil
 		}
 		if from.Type.Equals(String) {
-			expression.Go.WriteString("strconv_atoi(")
+
+			compiler.Import(Ilang)
+			compiler.Throws = true
+
+			if Deterministic {
+				expression.Go.WriteString("I.Atoi(ctx, ")
+				expression.Go.Write(from.Go.Bytes())
+				expression.Go.WriteString(")")
+				return expression, nil
+			}
+
+			expression.Go.WriteString("strconv_atoi(ctx,")
 			expression.Go.Write(from.Go.Bytes())
 			expression.Go.WriteString(")")
 
 			compiler.Import("strconv")
-			compiler.Require(`func strconv_atoi(s string) int {
-	i, _ := strconv.Atoi(s)
+			compiler.Require(`func strconv_atoi(ctx I.Context, s string) int {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		ctx.Throw(1, "invalid integer")
+	}
 	return i
 }
 `)
@@ -36,9 +50,16 @@ func (compiler *Compiler) Cast(from Expression, to Type) (Expression, error) {
 	//Casting to bit.
 	if to.Equals(Bit) {
 		if from.Type.Equals(Integer) {
-			expression.Go.Write([]byte("("))
-			expression.Go.Write(from.Go.Bytes())
-			expression.Go.Write([]byte(" != 0)"))
+			if Deterministic {
+				compiler.Import(Ilang)
+				expression.Go.Write([]byte("(!"))
+				expression.Go.Write(from.Go.Bytes())
+				expression.Go.Write([]byte(".Equals(I.Integer{}))"))
+			} else {
+				expression.Go.Write([]byte("("))
+				expression.Go.Write(from.Go.Bytes())
+				expression.Go.Write([]byte("!= 0)"))
+			}
 			return expression, nil
 		}
 	}
@@ -48,7 +69,7 @@ func (compiler *Compiler) Cast(from Expression, to Type) (Expression, error) {
 		if from.Type.Equals(Integer) {
 			expression.Go.Write([]byte("rune("))
 			expression.Go.Write(from.Go.Bytes())
-			expression.Go.Write([]byte(")"))
+			expression.Go.Write([]byte(".Int64())"))
 			return expression, nil
 		}
 	}
@@ -73,9 +94,14 @@ func (compiler *Compiler) ScanCast(t Type) (Expression, error) {
 		return Expression{}, err
 	}
 
+	expression, err := compiler.Cast(other, t)
+	if err != nil {
+		return expression, err
+	}
+
 	if !compiler.ScanIf(')') {
 		compiler.Expecting(')')
 	}
 
-	return compiler.Cast(other, t)
+	return expression, nil
 }

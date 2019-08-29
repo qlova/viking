@@ -9,7 +9,37 @@ import (
 )
 
 //CompileStatement compiles the next statement.
-func (compiler *Compiler) CompileStatement() error {
+func (compiler *Compiler) CompileStatement() (returning error) {
+	defer func(returning *error) {
+		if compiler.Throws && *returning == nil {
+			if !compiler.ScanIf(';') {
+				*returning = compiler.NewError("you need to handle the error")
+				return
+			}
+			compiler.Throws = false
+
+			switch compiler.Scan().String() {
+			case "break":
+				compiler.Go.WriteString("; if (len(ctx.Errors()) > 0) { break }")
+			case "ignore":
+				compiler.Go.WriteString("; ctx.Errors()")
+			case "for":
+				if !compiler.Scan().Is("errors") {
+					*returning = compiler.NewError("do you mean for errors?")
+					return
+				}
+				compiler.Go.WriteString("; for i, error := range ctx.Errors() {")
+				compiler.GainScope()
+				compiler.SetVariable(s("i"), Integer)
+				*returning = compiler.CompileBlock()
+				return
+			default:
+				*returning = compiler.NewError("unsupported tag " + compiler.LastToken.String())
+				return
+			}
+		}
+	}(&returning)
+
 	var token = compiler.Scan()
 	/*switch token {
 		case "if", "for", "return", "break", "go":
@@ -59,26 +89,30 @@ func (compiler *Compiler) CompileStatement() error {
 
 	//Main statement.
 	case "main":
-		compiler.Require(`
-type Error struct {
-	Code int
-	Message string
-}
-		
-type Context struct {
-	Error
-}
-`)
+		compiler.yield <- true
+		<-compiler.callback
+		compiler.Main = true
+
+		compiler.Import(Ilang)
 		compiler.Go.WriteString("func main() {\n")
 		compiler.GainScope()
 		compiler.Indent()
-		compiler.Go.WriteString(`var ctx = new(Context)` + "\n")
+		compiler.Go.WriteString(`var ctx = I.NewContext()` + "\n")
+
+		compiler.SetFlag(s("main"))
+
 		return compiler.CompileBlock()
+
+	case ";":
+		return compiler.NewError("statement doesn't throw error")
 
 	case "if":
 		return compiler.ScanIfStatement()
 
 	case "|":
+		if !compiler.GetFlag(s("if")) {
+			return compiler.NewError("| requires a preceding if statement")
+		}
 		compiler.LoseScope()
 		compiler.Indent()
 		compiler.Go.WriteString("} else {")
@@ -86,33 +120,7 @@ type Context struct {
 		return compiler.CompileBlock()
 
 	case "for":
-		var name = compiler.Scan()
-
-		if !compiler.Scan().Is("in") {
-			return compiler.NewError("expecting in")
-		}
-
-		var collection, err = compiler.ScanExpression()
-		if err != nil {
-			return err
-		}
-
-		if !collection.Is(Variadic) && !collection.Is(List) {
-			return compiler.NewError("unimplemented for loop for " + collection.Type.Name)
-		}
-
-		compiler.Indent()
-		compiler.Go.WriteString("for ")
-		compiler.Go.WriteString("_,")
-		compiler.Go.Write(name)
-		compiler.Go.WriteString(":= range ")
-		compiler.Go.Write(collection.Go.Bytes())
-		compiler.Go.WriteString("{")
-
-		compiler.GainScope()
-		compiler.SetVariable(name, *collection.Type.Subtype)
-
-		return compiler.CompileBlock()
+		return compiler.ScanForStatement()
 
 	//Return statement.
 	case "return":
@@ -145,27 +153,6 @@ type Context struct {
 		compiler.Go.Write(s("}"))
 		compiler.LoseScope()
 		return nil
-
-	case "catch":
-		compiler.Require(`
-func (ctx *Context) Catch() Error {
-	defer func() {
-		ctx.Error.Code = 0
-		ctx.Error.Message = ""
-	}()
-	return ctx.Error
-}
-
-`)
-
-		if err := compiler.CompileStatement(); err != nil {
-			return err
-		}
-		compiler.Go.WriteString("\n")
-		compiler.Indent()
-		compiler.Go.WriteString("if err := ctx.Catch(); err.Code > 0 {")
-		compiler.GainScope()
-		return compiler.CompileBlock()
 	}
 
 	//Inline target code.
@@ -204,7 +191,13 @@ func (ctx *Context) Catch() Error {
 		}
 	}
 
-	//Variable modification.
+	//Aliases.
+	if compiler.ScanIf('=') {
+		compiler.DefineAlias(token)
+		return nil
+	}
+
+	//Variables.
 	if compiler.ScanIf('$') {
 		if compiler.ScanIf('=') {
 			compiler.Indent()

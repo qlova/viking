@@ -1,13 +1,17 @@
 package compiler
 
 import (
-	"github.com/qlova/viking/compiler/target"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/qlova/viking/compiler/target"
 )
+
+//Ilang is the Ilang package for Go.
+const Ilang = "github.com/qlova/i"
 
 //ReservedWords are not available for use as names.
 var ReservedWords = []string{"if", "for", "return", "break", "go", "in"}
@@ -48,6 +52,11 @@ type Compiler struct {
 	Frames []Context
 
 	Buffers []target.Buffer
+
+	//signals for file processing.
+	yield, callback chan bool
+
+	Main bool
 }
 
 //New returns a new initialised compiler.
@@ -61,6 +70,7 @@ func New() Compiler {
 func (compiler *Compiler) Init() {
 	compiler.Functions = make(map[string]*Type)
 	compiler.Concepts = make(map[string]Concept)
+	compiler.Aliases = make(map[string]Alias)
 }
 
 //NewScope creates and returns a new compiler scope.
@@ -187,6 +197,13 @@ func (compiler *Compiler) Import(pkg string) {
 
 	if _, ok := compiler.Imports[pkg]; !ok {
 		compiler.Imports[pkg] = struct{}{}
+
+		if pkg == Ilang {
+			compiler.Go.Head.Write([]byte(`import I "` + pkg + `"`))
+			compiler.Go.Head.Write([]byte("\n"))
+			return
+		}
+
 		compiler.Go.Head.Write([]byte(`import "` + pkg + `"`))
 		compiler.Go.Head.Write([]byte("\n"))
 	}
@@ -224,7 +241,7 @@ func (compiler *Compiler) Indent(writers ...io.Writer) {
 //ScanLine attempts to scan a newline, an error is returned if no newline is found.
 func (compiler *Compiler) ScanLine() error {
 	var token = compiler.Scan()
-	if token.Is("\n") {
+	if token.Is("\n") || token.Is("") {
 		return nil
 	}
 	if len(token) >= 2 && (token[0] == '/' && token[1] == '/') {
@@ -244,16 +261,57 @@ func (compiler *Compiler) Compile() error {
 
 	compiler.Go.Head.Write([]byte("package main\n\n"))
 
+	var next = make(chan bool)
+	var done = make(chan error, 1)
+
+	compiler.yield = make(chan bool)
+	compiler.callback = make(chan bool)
+
+	var yielded = false
+
 	for _, file := range files {
 		if path.Ext(file.Name()) == ".i" {
-			err := compiler.CompileFile(compiler.Directory + "/" + file.Name())
-			if err != nil {
-				return err
+			go func() {
+				if yielded {
+					compiler.PushContext(compiler.NewContext())
+				}
+				compilerError := compiler.CompileFile(compiler.Directory + "/" + file.Name())
+				if compiler.Main {
+					done <- compilerError
+					next <- true
+					return
+				}
+				if compilerError != nil {
+					err = compilerError
+				}
+				next <- true
+			}()
+
+		loop:
+			for {
+				select {
+				case <-compiler.yield:
+					yielded = true
+					break loop
+				case <-next:
+					break loop
+				}
 			}
 		}
 	}
 
-	return nil
+	if yielded {
+		compiler.callback <- true
+	} else {
+		done <- nil
+	}
+
+	if err != nil {
+		<-done
+		return err
+	}
+
+	return <-done
 }
 
 //CompileBlock compiles an 'i' code block.
@@ -263,7 +321,10 @@ func (compiler *Compiler) CompileBlock() error {
 			compiler.LoseScope()
 			compiler.Go.Write([]byte("}"))
 		}()
-		return compiler.CompileStatement()
+		if err := compiler.CompileStatement(); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	if !compiler.ScanIf('\n') {

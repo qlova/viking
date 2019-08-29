@@ -7,15 +7,6 @@ import (
 //Builtins is a list of all builtin functions.
 var Builtins = []string{"print", "out", "in", "copy", "throw"}
 
-//Throw builtin.
-const Throw = `func (ctx *Context) Throw(code int, msg string) {
-	ctx.Error = Error{
-		Code: code,
-		Message: msg,
-	}
-}
-`
-
 //Builtin returns true if the builtin exists.
 func Builtin(check Token) bool {
 	for _, builtin := range Builtins {
@@ -57,6 +48,8 @@ func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
 
 		return Expression{}, compiler.Unimplemented(s("copy for " + argument.Type.Name))
 	case "in":
+		compiler.Throws = true
+
 		if !compiler.ScanIf('(') {
 			return Expression{}, compiler.Expecting('(')
 		}
@@ -72,17 +65,18 @@ func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
 
 		if argument.Equals(Symbol) {
 			expression.Type = String
-			expression.Go.WriteString("in_symbol(")
+			expression.Go.WriteString("in_symbol(ctx, ")
 			expression.Go.Write(argument.Go.Bytes())
 			expression.Go.WriteString(")")
 
 			compiler.Import("os")
 			compiler.Import("bufio")
+			compiler.Import(Ilang)
 			compiler.Require("var std_in = bufio.NewReader(os.Stdin)\n")
-			compiler.Require(`func in_symbol(r rune) string {
+			compiler.Require(`func in_symbol(ctx I.Context, r rune) string {
 	s, err := std_in.ReadString(byte(r))
 	if err != nil {
-		fmt.Println(err)
+		ctx.Throw(1, err.Error())
 		return ""
 	}
 	return s[:len(s)-1]
@@ -145,12 +139,7 @@ func (compiler *Compiler) CompileBuiltin(builtin Token) error {
 			}
 		}
 
-		compiler.Go.Write([]byte(")\n"))
-
-		err = compiler.ScanLine()
-		if err != nil {
-			return err
-		}
+		compiler.Go.Write([]byte(")"))
 
 		return nil
 	}
