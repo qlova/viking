@@ -1,5 +1,36 @@
 package compiler
 
+import "strconv"
+
+//ConcatArray joins two arrays.
+func (compiler *Compiler) ConcatArray(a, b Expression) (Expression, error) {
+	if !b.Is(Array) && a.Equals(b.Type) {
+		return Expression{}, compiler.NewError("cannot add array and " + b.Type.Name)
+	}
+
+	var result = compiler.NewExpression()
+	result.Type = a.Type
+	result.Size = a.Type.Size + b.Type.Size
+
+	result.Go.Write(GoTypeOf(result.Type))
+	result.Go.WriteString(`{`)
+	result.Go.Write(a.Go.Bytes())
+	result.Go.WriteString(`[0]`)
+	for i := 1; i < a.Size; i++ {
+		result.Go.WriteString(`,`)
+		result.Go.Write(a.Go.Bytes())
+		result.Go.WriteString(`[` + strconv.Itoa(i) + `]`)
+	}
+	for i := 0; i < b.Size; i++ {
+		result.Go.WriteString(`,`)
+		result.Go.Write(b.Go.Bytes())
+		result.Go.WriteString(`[` + strconv.Itoa(i) + `]`)
+	}
+	result.Go.WriteString(`}`)
+
+	return result, nil
+}
+
 //IndexArray indexes the array with the specified index.
 func (compiler *Compiler) IndexArray(array, index Expression) (Expression, error) {
 	if !index.Type.Equals(Integer) {

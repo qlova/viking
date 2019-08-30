@@ -64,24 +64,12 @@ func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
 		}
 
 		if argument.Equals(Symbol) {
+			compiler.Import(Ilang)
+
 			expression.Type = String
-			expression.Go.WriteString("in_symbol(ctx, ")
+			expression.Go.WriteString("I.InSymbol(ctx, ")
 			expression.Go.Write(argument.Go.Bytes())
 			expression.Go.WriteString(")")
-
-			compiler.Import("os")
-			compiler.Import("bufio")
-			compiler.Import(Ilang)
-			compiler.Require("var std_in = bufio.NewReader(os.Stdin)\n")
-			compiler.Require(`func in_symbol(ctx I.Context, r rune) string {
-	s, err := std_in.ReadString(byte(r))
-	if err != nil {
-		ctx.Throw(1, err.Error())
-		return ""
-	}
-	return s[:len(s)-1]
-}
-`)
 			return expression, nil
 		}
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -10,15 +11,17 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/qlova/i"
 	"github.com/qlova/viking/compiler/target"
 
 	"github.com/cosmos72/gomacro/fast"
 	"github.com/cosmos72/gomacro/imports"
 	"github.com/qlova/viking/compiler"
+
+	_ "github.com/qlova/i/imacro"
 )
 
 func init() {
-	imports.Packages.Merge(Packages)
 	imports.Packages["os"].Binds["Stdin"] = reflect.ValueOf(&os.Stdin).Elem()
 }
 
@@ -132,6 +135,7 @@ func SandBox(input []byte, f func()) []byte {
 		out <- buf.Bytes()
 	}()
 	wg.Wait()
+	i.Stdin = bufio.NewReader(os.Stdin)
 	f()
 	writer.Close()
 	return <-out

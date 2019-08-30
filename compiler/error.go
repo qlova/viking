@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strings"
 )
@@ -22,7 +23,10 @@ func (err Error) Error() string {
 }
 
 func (compiler *Compiler) NewError(msg string) error {
-	var wdir, _ = os.Getwd()
+	var wdir string
+	if runtime.GOOS != "js" {
+		wdir, _ = os.Getwd()
+	}
 
 	var rpath, _ = filepath.Rel(wdir, compiler.Directory)
 

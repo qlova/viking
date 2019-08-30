@@ -89,8 +89,11 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 
 	//Main statement.
 	case "main":
-		compiler.yield <- true
-		<-compiler.callback
+		//Wait for the rest of the package to compile.
+		if compiler.yield != nil {
+			compiler.yield <- true
+			<-compiler.callback
+		}
 		compiler.Main = true
 
 		compiler.Import(Ilang)

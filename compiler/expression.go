@@ -159,9 +159,9 @@ func (compiler *Compiler) expression(token Token) (Expression, error) {
 		return expression, nil
 	}
 
-	//List expression.
+	//Array expression.
 	if token.Is("[") {
-		expression.Type = List
+		expression.Type = Array
 
 		var first, err = compiler.ScanExpression()
 		if err != nil {
@@ -170,24 +170,31 @@ func (compiler *Compiler) expression(token Token) (Expression, error) {
 
 		expression.Type.Subtype = &first.Type
 
-		expression.Go.Write(GoTypeOf(expression.Type))
-		expression.Go.WriteByte('{')
-		expression.Go.Write(first.Go.Bytes())
+		var count = 1
+		var buffer = compiler.NewExpression()
+		buffer.Go.WriteByte('{')
+		buffer.Go.Write(first.Go.Bytes())
 
 		for compiler.ScanIf(',') {
-			expression.Go.WriteByte(',')
+			buffer.Go.WriteByte(',')
 
 			var item, err = compiler.ScanExpression()
 			if err != nil {
 				return Expression{}, err
 			}
-			expression.Go.Write(item.Go.Bytes())
+			buffer.Go.Write(item.Go.Bytes())
+
+			count++
 		}
 
 		if !compiler.ScanIf(']') {
 			return Expression{}, compiler.Expecting(']')
 		}
-		expression.Go.WriteByte('}')
+		buffer.Go.WriteByte('}')
+
+		expression.Type.Size = count
+		expression.Go.Write(GoTypeOf(expression.Type))
+		expression.Go.Write(buffer.Go.Bytes())
 
 		return expression, nil
 	}
@@ -201,7 +208,7 @@ func (compiler *Compiler) expression(token Token) (Expression, error) {
 			return Expression{}, err
 		}
 
-		if collection.Is(List) || collection.Is(String) {
+		if collection.Is(List) || collection.Is(String) || collection.Is(Array) {
 
 			if Deterministic {
 				compiler.Import(Ilang)

@@ -58,3 +58,24 @@ func (compiler *Compiler) AssignVariable(name []byte) error {
 
 	return nil
 }
+
+//ShortcutAssignVariable modifies the variable 'name' with the scanned value.
+func (compiler *Compiler) ShortcutAssignVariable(name []byte) error {
+	var variable = compiler.GetVariable(name)
+
+	var expression, err = compiler.ScanExpression()
+	if err != nil {
+		return err
+	}
+	if !expression.Type.Equals(variable) {
+		return compiler.NewError("type mismatch")
+	}
+
+	compiler.SetVariable(name, expression.Type)
+	compiler.Go.Write(name)
+	compiler.Go.Write([]byte(" = "))
+	compiler.Go.Write(expression.Go.Bytes())
+
+	return nil
+}
+

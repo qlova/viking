@@ -254,6 +254,17 @@ func (compiler *Compiler) ScanLine() error {
 
 //Compile package located at Compiler.Dir or current working directory if empty.
 func (compiler *Compiler) Compile() error {
+	pkg, err := os.Open(compiler.Directory)
+	if err != nil {
+		return err
+	}
+
+	if info, err := pkg.Stat(); err != nil {
+		return err
+	} else if !info.IsDir() {
+		return compiler.CompileFile(compiler.Directory)
+	}
+
 	files, err := ioutil.ReadDir(compiler.Directory)
 	if err != nil {
 		return err
