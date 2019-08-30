@@ -1,0 +1,194 @@
+<!doctype html>
+<!--
+Copyright 2018 The Go Authors. All rights reserved.
+Use of this source code is governed by a BSD-style
+license that can be found in the LICENSE file.
+
+Copyright 2019 Qlova Limited. All rights reserved.
+Use of this source code is governed by a MPL-style
+license that can be found at license.qlova.co.nz
+-->
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name=viewport content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no">
+	<meta name=mobile-web-app-capable content="yes">
+	<meta name=apple-mobile-web-app-capable content="yes">
+	<meta name=apple-mobile-web-app-status-bar-style content="black">
+	
+	<title>Go wasm</title>
+	
+	<style>
+		html, body {
+			margin: 0;
+			overflow: hidden;
+		}
+		#eruda {
+			display: none;
+		}
+		#terminal {
+			height: 30%;
+		}
+		.xterm {
+			padding: 20px;
+		}
+	</style>
+	
+	<script src="//cdn.jsdelivr.net/npm/eruda"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.3/ace.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.js"></script>
+	<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.css">
+</head>
+
+<body>
+	<!--
+	Add the following polyfill for Microsoft Edge 17/18 support:
+	<script src="https://cdn.jsdelivr.net/npm/text-encoding@0.7.0/lib/encoding.min.js"></script>
+	(see https://caniuse.com/#feat=textencoder)
+	-->
+	<script src="wasm_exec.js"></script>
+	<script>
+		async function load(value) {
+			let response = await fetch("/viking/examples/"+value+".i");
+			let text = await response.text();
+			editor.setValue(text);
+		}
+
+		eruda.init({
+			tool: ['console'],
+			useShadowDom: false,
+		});
+		
+		let console = eruda.get('console');
+		console.on('log', function (log) {
+			term.write(log);
+			term.write('\r\n');
+		});
+
+		if (!WebAssembly.instantiateStreaming) { // polyfill
+			WebAssembly.instantiateStreaming = async (resp, importObject) => {
+				const source = await (await resp).arrayBuffer();
+				return await WebAssembly.instantiate(source, importObject);
+			};
+		}
+
+		var go = new Go();
+		go._exitPromise.then(function(q) {
+			term.write("\n[Process Exited]\n\r");
+			window.exited = true;
+		})
+		let mod, inst;
+		WebAssembly.instantiateStreaming(fetch("playground.wasm"), go.importObject).then((result) => {
+			mod = result.module;
+			inst = result.instance;
+			document.getElementById("runButton").disabled = false;
+		}).catch((err) => {
+			console.error(err);
+		});
+
+		window.exited = true;
+
+		async function run() {
+			term.write("\n\r")
+			term.clear();
+			window.exited = false;
+
+			term.clear();
+			window.stdin.buffer = "";
+
+			await go.run(inst);
+			
+			go = new Go();
+			inst = await WebAssembly.instantiate(mod, go.importObject); // reset instance
+			go._exitPromise.then(function(q) {
+				term.write("\n[Process Exited]\n\r");
+				window.exited = true;
+			})
+		}
+	</script>
+	
+	<div style="display:flex; flex-direction: column; height: 100vh;">
+		<div style="display:flex; flex-direction: row; width: 100vh;">
+			<button style="height: 2em;" onClick="run();" id="runButton" disabled>Run</button>
+			<select style="height: 2em;" onchange="load(value)">
+				<option></option>
+				<option>A+B</option>
+			</select>
+		</div>
+		<div id="input" onclick="eruda.hide();" onchange="window.localStorage.setItem('code', editor.getValue())" style="width:100%; height: 80%; flex-grow:1;">main: print("Hello World")<br>
+		</div>
+		<div id=terminal></div>
+	</div>
+
+	<script>
+		window.stdin = {};
+		window.stdin.buffer = "";
+		window.stdin.callback = null;
+		window.stdin.Read = function(length, callback) {
+			window.stdin.callback = function() {
+				if (window.stdin.buffer.length >= length) {
+					callback(window.stdin.buffer.slice(0, length));
+					window.stdin.buffer = window.stdin.buffer.slice(length-1)
+					return;
+				}
+				callback(window.stdin.buffer);
+				window.stdin.buffer = "";
+			};
+		};
+
+		var editor = ace.edit(document.getElementById("input"));
+		if (window.localStorage.getItem('code')) editor.setValue(window.localStorage.getItem('code'));
+
+		var term = new Terminal();
+        term.open(document.getElementById('terminal'));
+
+		function runFakeTerminal() {
+        if (term._initialized) {
+            return;
+        }
+
+        term._initialized = true;
+
+        term.prompt = () => {
+            term.write('\r\n');
+        };
+
+		let buffer = "";
+        term.on('key', function(key, ev) {
+			if (window.exited) return;
+
+            const printable = !ev.altKey && !ev.altGraphKey && !ev.ctrlKey && !ev.metaKey;
+
+            if (ev.keyCode === 13) {
+                term.prompt();
+				window.stdin.buffer += buffer+"\n";
+				buffer = "";
+
+				if (window.stdin.callback) {
+					window.stdin.callback();
+					window.stdin.callback = null;
+				}
+
+            } else if (ev.keyCode === 8) {
+                // Do not delete the prompt
+                if (term._core.buffer.x > 0) {
+                    term.write('\b \b');
+					buffer.pop();
+                }
+            } else if (printable) {
+                term.write(key);
+				buffer += key;
+            }
+        });
+
+        term.on('paste', function(data) {
+            term.write(data);
+        });
+    }
+    runFakeTerminal();
+
+	</script>
+</body>
+
+</html>
