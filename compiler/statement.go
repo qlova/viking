@@ -189,8 +189,10 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 	//Array modification.
 	if compiler.Peek().Is("[") {
 		if Defined(compiler.GetVariable(token)) {
+			compiler.Scan()
+
 			compiler.Indent()
-			return compiler.ModifyArray(token)
+			return compiler.ModifyCollection(token)
 		}
 	}
 

@@ -145,12 +145,10 @@ func (compiler *Compiler) Collection(t Type, subtype Type) (Expression, error) {
 	expression.Type = t
 	expression.Type.Subtype = &subtype
 
-	var next = compiler.Scan()
-
 	var index, other = compiler.NewExpression(), compiler.NewExpression()
 	var err error
 
-	if next.Is("[") {
+	if compiler.ScanIf('[') {
 		index, err = compiler.ScanExpression()
 		if err != nil {
 			return Expression{}, err
@@ -195,7 +193,11 @@ func (compiler *Compiler) Collection(t Type, subtype Type) (Expression, error) {
 		expression.Go.Write(GoTypeOf(expression.Type))
 		expression.Go.WriteString("{}")
 		return expression, nil
+	case "list":
+		expression.Go.Write(GoTypeOf(expression.Type))
+		expression.Go.WriteString("{}")
+		return expression, nil
 	}
 
-	return Expression{}, compiler.NewError("Invalid type")
+	return Expression{}, compiler.NewError("Invalid type: " + t.Name)
 }

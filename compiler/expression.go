@@ -217,6 +217,11 @@ func (compiler *Compiler) expression(token Token) (Expression, error) {
 			expression.Go.WriteString("len(")
 			expression.Go.Write(collection.Go.Bytes())
 			expression.Go.WriteString(")")
+
+			if collection.Is(List) {
+				expression.Go.WriteString("-1")
+			}
+
 			if Deterministic {
 				expression.Go.WriteString(")")
 			}
