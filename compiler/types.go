@@ -106,9 +106,13 @@ func (compiler *Compiler) Type(t Type) (Expression, error) {
 	switch t.Name {
 	case "integer":
 		expression.Go.Write([]byte("int(0)"))
+	case "bit":
+		expression.Go.Write([]byte("false"))
+	default:
+		return Expression{}, compiler.NewError("Invalid type")
 	}
 
-	return Expression{}, compiler.NewError("Invalid type")
+	return expression, nil
 }
 
 //Deterministic sets the compiler to produce Deterministic code.
