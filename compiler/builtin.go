@@ -54,6 +54,14 @@ func (compiler *Compiler) CallBuiltin(builtin Token) (Expression, error) {
 			return Expression{}, compiler.Expecting('(')
 		}
 
+		if compiler.ScanIf(')') {
+			compiler.Import(Ilang)
+
+			expression.Type = String
+			expression.Go.WriteString("I.InSymbol(ctx, '\n')")
+			return expression, nil
+		}
+
 		var argument, err = compiler.ScanExpression()
 		if err != nil {
 			return Expression{}, err
@@ -84,6 +92,11 @@ func (compiler *Compiler) CompileBuiltin(builtin Token) error {
 
 		if !compiler.ScanIf('(') {
 			return compiler.Expecting('(')
+		}
+
+		if compiler.ScanIf(')') {
+			compiler.Go.Write([]byte("fmt.Println()"))
+			return nil
 		}
 
 		var Arguments []Expression
