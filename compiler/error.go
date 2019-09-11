@@ -34,7 +34,14 @@ func (compiler *Compiler) NewError(msg string) error {
 		rpath = compiler.Directory
 	}
 
-	var RestOfTheLine, _ = compiler.Reader.ReadString('\n')
+	var RestOfTheLine string
+
+	if compiler.Column == 0 {
+		RestOfTheLine = string(compiler.LastLine)
+		compiler.Column = len(compiler.LastLine)
+	} else {
+		RestOfTheLine, _ = compiler.Reader.ReadString('\n')
+	}
 
 	var formatted = fmt.Sprint(rpath, compiler.Filename, ":",
 		compiler.LineNumber, ": ", string(compiler.Line), RestOfTheLine, "\n",
