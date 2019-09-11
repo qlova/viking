@@ -199,6 +199,32 @@ func (compiler *Compiler) expression(token Token) (Expression, error) {
 		return expression, nil
 	}
 
+	//Invert/Negative.
+	if token.Is("-") {
+		var numeric, err = compiler.scanExpression()
+		if err != nil {
+			return Expression{}, err
+		}
+
+		if !numeric.Type.Equals(Integer) {
+			return Expression{}, compiler.NewError("cannot invert " + numeric.Type.Name)
+		}
+
+		expression.Type = numeric.Type
+
+		if Deterministic {
+			expression.Go.WriteString("(I.NewInteger(0).Sub(")
+			expression.Go.Write(numeric.Go.Bytes())
+			expression.Go.WriteString("))")
+		} else {
+			expression.Go.WriteString("(-")
+			expression.Go.Write(numeric.Go.Bytes())
+			expression.Go.WriteString(")")
+		}
+
+		return expression, nil
+	}
+
 	//Length expression.
 	if token.Is("#") {
 		expression.Type = Integer
