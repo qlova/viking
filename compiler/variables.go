@@ -48,7 +48,10 @@ func (compiler *Compiler) AssignVariable(name []byte) error {
 		return err
 	}
 	if !expression.Type.Equals(variable) {
-		return compiler.NewError("type mismatch")
+		expression, err = compiler.Cast(expression, variable)
+		if err != nil {
+			return compiler.NewError("cannot assign value of type " + expression.Type.Name + " to variable of type " + variable.Name)
+		}
 	}
 
 	compiler.SetVariable(name, expression.Type)
@@ -78,4 +81,3 @@ func (compiler *Compiler) ShortcutAssignVariable(name []byte) error {
 
 	return nil
 }
-
