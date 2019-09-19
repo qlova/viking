@@ -11,6 +11,8 @@ import (
 
 	"github.com/cosmos72/gomacro/fast"
 	"github.com/qlova/viking/compiler"
+	_ "github.com/qlova/viking/compiler/builtin"
+	_ "github.com/qlova/viking/compiler/statement"
 
 	_ "github.com/qlova/i/imacro"
 )

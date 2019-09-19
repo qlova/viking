@@ -1,7 +1,7 @@
 package compiler
 
 //Prototypes is a list of all Prototype types.
-var Prototypes []Prototype
+/*var Prototypes []Prototype
 
 //Prototype is a type of type.
 type Prototype struct {
@@ -41,32 +41,32 @@ func init() {
 			return Expression{}, compiler.Expecting(')')
 		}
 
-		if other.Equals(String) {
-			compiler.Throws = true
+		/*if other.Equals(String) {
+					compiler.Throws = true
 
-			compiler.Import("strconv")
-			compiler.Require(Number.Requirement)
-			compiler.Require(`func strconv_aton(ctx I.Context, s string) number {
-	if i, err := strconv.Atoi(s); err == nil {
-		return i
-	}
-	if f, err := strconv.ParseFloat(s, 64); err == nil {
-		return f
-	}
-	ctx.Throw(1, "invalid number")
-	return 0
-}
-`)
-
-			var expression = compiler.NewExpression()
-			expression.Type = Number.Type()
-			expression.Go.WriteString("strconv_aton(ctx,")
-			expression.Go.Write(other.Go.Bytes())
-			expression.Go.WriteString(")")
-			return expression, nil
+					compiler.Import("strconv")
+					compiler.Require(Number.Requirement)
+					compiler.Require(`func strconv_aton(ctx I.Context, s string) number {
+			if i, err := strconv.Atoi(s); err == nil {
+				return i
+			}
+			if f, err := strconv.ParseFloat(s, 64); err == nil {
+				return f
+			}
+			ctx.Throw(1, "invalid number")
+			return 0
 		}
+		`)
 
-		return other, compiler.Unimplemented(s("number()"))
+					var expression = compiler.NewExpression()
+					expression.Type = Number.Type()
+					expression.Go.WriteString("strconv_aton(ctx,")
+					expression.Go.Write(other.Go.Bytes())
+					expression.Go.WriteString(")")
+					return expression, nil
+				}*/
+
+/*return other, compiler.Unimplemented(s("number()"))
 	}
 }
 
@@ -96,4 +96,4 @@ func (compiler *Compiler) GetPrototype(name []byte) Prototype {
 
 func init() {
 	Prototypes = []Prototype{Number, Collection, Instruction, Data, Connection}
-}
+}*/

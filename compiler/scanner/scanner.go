@@ -31,6 +31,11 @@ func (scanner *Scanner) SetReader(reader io.Reader) {
 	scanner.Reader = bufio.NewReader(reader)
 }
 
+//Token returns the last scanned token.
+func (scanner *Scanner) Token() Token {
+	return scanner.LastToken
+}
+
 //Peek returns the next token without advancing the scanner.
 func (scanner *Scanner) Peek() Token {
 	next := scanner.scan()

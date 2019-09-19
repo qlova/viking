@@ -19,7 +19,7 @@ type Context struct {
 	TypeDefinition       Type
 
 	//Functions is the defined global functions available to this context.
-	Functions map[string]*Type
+	Functions map[string]Type
 	Concepts  map[string]Concept
 
 	Depth  int
@@ -39,7 +39,7 @@ type Context struct {
 //NewContext pushes a new context to the compiler.
 func (compiler *Compiler) NewContext() Context {
 	var ctx Context
-	ctx.Returns = &Type{}
+	ctx.Returns = new(Type)
 	ctx.Concepts = compiler.Concepts
 	ctx.Functions = compiler.Functions
 	ctx.Aliases = compiler.Aliases
@@ -50,9 +50,9 @@ func (compiler *Compiler) NewContext() Context {
 //NewPackageContext pushes a new context to the compiler with unique functions and concept maps.
 func (compiler *Compiler) NewPackageContext() Context {
 	var ctx Context
-	ctx.Returns = &Type{}
+	ctx.Returns = new(Type)
 	ctx.Concepts = make(map[string]Concept)
-	ctx.Functions = make(map[string]*Type)
+	ctx.Functions = make(map[string]Type)
 	ctx.Aliases = make(map[string]Alias)
 	ctx.Directory = compiler.Directory
 	return ctx

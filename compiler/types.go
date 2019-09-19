@@ -1,207 +1,132 @@
 package compiler
 
-import "strconv"
+//Types is a slice of all static types that the compiler package is aware of.
+var Types = []Type{Nothing{}, Thing{}, Sequence{}}
 
-//Field is an 'i' type field.
-type Field struct {
-	Name     string
-	Type     Type
-	Embedded bool
-	Exported bool
+//RegisterType registers a new type to the compiler package and then returns it.
+func RegisterType(T Type) Type {
+	Types = append(Types, T)
+	return T
 }
 
-//Type is a 'i' type.
-type Type struct {
-	Prototype
-
-	Name    string
-	Size    int
-	Subtype *Type
-
-	//Can this type be modified?
-	Frozen bool
-
-	//Is this type a share?
-	Share bool
-
-	//The relative purchase value of this type.
-	Value int
-
-	Fields []Field
+//Runnable are runnable things.
+type Runnable interface {
+	Call(c *Compiler, this Expression, args ...Expression) (Expression, error)
+	Run(c *Compiler, this Expression, args ...Expression) error
 }
 
-//String is an immutable sequence of symbols.
-var String = Type{Name: "string", Prototype: Data}
+//Type is an abstract type interface that can be used to define new types.
+type Type interface {
+	//Name should return the name of this type.
+	Name() String
 
-//Symbol is a contextual reference point.
-var Symbol = Type{Name: "symbol", Prototype: Data}
+	//String returns this type as a human readable string.
+	String(c *Compiler) string
 
-//Integer is a positive or negative integer.
-var Integer = Type{Name: "integer", Prototype: Number}
+	//Expression should evaluate the current token and attempt to return it as an expression of this type.
+	//ok if success.
+	Expression(c *Compiler) (bool, Expression, error)
 
-//Byte is a precisional reference point.
-var Byte = Type{Name: "byte", Prototype: Data}
+	//Operation operates on Type (a) with Expression (b) based on the provided symbol.
+	Operation(c *Compiler, a, b Expression, symbol string) (bool, Expression, error)
 
-//Function is a code block that can be run with parameters.
-var Function = Type{Name: "function", Prototype: Instruction}
+	//Cast cast this type as a from Expression to the requested 'to' type.
+	Cast(c *Compiler, from Expression, to Type) (Expression, error)
 
-//Array is a fixed-length sequence of values.
-var Array = Type{Name: "array", Prototype: Collection}
+	//Equals should return true if the other type is exactly the same as this type.
+	Equals(other Type) bool
 
-//Variadic is a dynamic-length sequence of values.
-var Variadic = Type{Name: "variadic", Prototype: Collection}
+	//Native is a helper method that returns the native type token for this type.
+	Native(c *Compiler) Token
 
-//Bit is a type that can represent 2 values.
-var Bit = Type{Name: "bit", Prototype: Data}
+	//Zero is a helper method that returns the zero-value of this type.
+	Zero(c *Compiler) Expression
 
-//Types is a slice of all 'i' types.
-var Types = []Type{String, Integer, Symbol, Array, List, Byte, Function, Variadic, Bit}
-
-//Is returns true if Type is a collection of type 'collection'.
-func (a Type) Is(collection Type) bool {
-	return a.Name == collection.Name
+	//Copy is a helper method that returns a copy of an expression of this type.
+	Copy(c *Compiler, e Expression) (Expression, error)
 }
 
-//Collection returns Type 'a' in collection.
-func (a Type) Collection(collection Type) Type {
-	collection.Subtype = &a
-	return collection
+//Collection is a supertype of Type, collections can contain subtypes, be indexed and called.
+type Collection interface {
+	Type
+
+	//Index a value of this type with the specified indicies.
+	Index(c *Compiler, this Expression, indices ...Expression) (Expression, error)
+
+	//Modify a value of this type with the specified indicies.
+	Modify(c *Compiler, this Expression, modification Expression, indices ...Expression) error
+
+	//Specify this type with the provided args.
+	Specify(c *Compiler, args ...Expression) (Type, error)
+
+	//With should return this type containing the provided subtype.
+	With(c *Compiler, subtype Type) Type
+
+	//Subtype returns the subtype of this collection.
+	Subtype() Type
+
+	//Length returns the size of this collection as an expression.
+	Length(c *Compiler, this Expression) Expression
 }
 
-//Equals checks if Type a is equal to Type b.
-func (a Type) Equals(b Type) bool {
+//Connection is a connection with the outside world.
+type Connection interface {
+	In(this Expression, args ...Expression) (Expression, error)
+	Out(this Expression, args ...Expression) error
+}
 
-	if a.Subtype != nil && b.Subtype != nil {
-		return a.Name == b.Name && a.Subtype.Equals(*b.Subtype)
+//SpecifyType specifies a collection type.
+func (compiler *Compiler) SpecifyType(T Type) (Type, error) {
+	var args, err = compiler.Indicies()
+	if err != nil {
+		return nil, err
 	}
 
-	if a.Subtype == nil && b.Subtype == nil {
-		return a.Name == b.Name
+	var subtype Type
+	if compiler.ScanIf('.') {
+
+		subtype = compiler.Type(compiler.Scan())
+		if !Defined(subtype) {
+			return nil, compiler.NewError(compiler.Token().String() + " is not a type!")
+		}
+		subtype, err = compiler.SpecifyType(subtype)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if a.Subtype == nil || b.Subtype == nil {
-		return false
+	if collection, ok := T.(Collection); ok {
+		T, err = collection.Specify(compiler, args...)
+		if err != nil {
+			return nil, err
+		}
+		if T == nil {
+			return nil, compiler.NewError("cannot specify " + T.String(compiler))
+		}
+		T = T.(Collection).With(compiler, subtype)
+	} else if len(args) > 0 || subtype != nil {
+		return nil, compiler.NewError(T.Name()[English] + " is not a collection type!")
 	}
 
-	return a.Name == b.Name
+	return T, nil
 }
 
-//GetType returns the Type with the given name.
-func (compiler *Compiler) GetType(name []byte) Type {
+//Type returns the Type with the given name.
+func (compiler *Compiler) Type(name []byte) Type {
 
 	for _, t := range Types {
-		if equal(name, t.Name) {
+		if equal(name, t.Name()[compiler.Language]) {
 			return t
 		}
 	}
 
-	return Type{}
-}
-
-//Type returns the type as an expression.
-func (compiler *Compiler) Type(t Type) (Expression, error) {
-	var expression = compiler.NewExpression()
-	expression.Type = t
-
-	switch t.Name {
-	case "integer":
-		expression.Go.Write([]byte("int(0)"))
-	case "bit":
-		expression.Go.Write([]byte("false"))
-	default:
-		return Expression{}, compiler.NewError("Invalid type")
-	}
-
-	return expression, nil
+	return nil
 }
 
 //Deterministic sets the compiler to produce Deterministic code.
 var Deterministic = true
 
 //GoTypeOf returns the go type of the Type.
-func GoTypeOf(t Type) []byte {
-	switch t.Name {
-	case "array":
-		return append(append([]byte("["+strconv.Itoa(t.Size)+"]"), GoTypeOf(*t.Subtype)...))
-	case "list":
-		return append(append([]byte("[]"), GoTypeOf(*t.Subtype)...))
-	case "string":
-		return s("string")
-	case "integer":
-		if Deterministic {
-			return s("I.Integer")
-		}
-		return s("int")
-	case "function":
-		return s("func(I.Context)")
-	case "symbol":
-		return s("rune")
-	case "bit":
-		return s("bool")
-	}
-
-	panic("unimplemented " + t.Name)
-}
-
-//Collection returns a collection of Type t with the specified subtype.
-func (compiler *Compiler) Collection(t Type, subtype Type) (Expression, error) {
-	var expression = compiler.NewExpression()
-	expression.Type = t
-	expression.Type.Subtype = &subtype
-
-	var index, other = compiler.NewExpression(), compiler.NewExpression()
-	var err error
-
-	if compiler.ScanIf('[') {
-		index, err = compiler.ScanExpression()
-		if err != nil {
-			return Expression{}, err
-		}
-
-		if !compiler.ScanIf(']') {
-			return Expression{}, compiler.Expecting(']')
-		}
-	}
-
-	if !compiler.ScanIf('(') {
-		return Expression{}, compiler.Expecting('(')
-	}
-
-	if !compiler.ScanIf(')') {
-		other, err = compiler.ScanExpression()
-		if err != nil {
-			return Expression{}, err
-		}
-
-		if !compiler.ScanIf(')') {
-			return Expression{}, compiler.Expecting(')')
-		}
-	}
-
-	switch t.Name {
-	case "array":
-		size, err := strconv.Atoi(string(index.Go.Bytes()))
-
-		if Deterministic {
-			index := index.Go.String()
-			size, err = strconv.Atoi(index[len("I.NewInteger(") : len(index)-1])
-		}
-
-		if err != nil {
-			return Expression{}, compiler.NewError("Invalid array size " + strconv.Itoa(size))
-		}
-
-		_ = other.Go.String()
-
-		expression.Size = size
-		expression.Go.Write(GoTypeOf(expression.Type))
-		expression.Go.WriteString("{}")
-		return expression, nil
-	case "list":
-		expression.Go.Write(GoTypeOf(expression.Type))
-		expression.Go.WriteString("{}")
-		return expression, nil
-	}
-
-	return Expression{}, compiler.NewError("Invalid type: " + t.Name)
+func (compiler *Compiler) GoTypeOf(t Type) []byte {
+	return t.Native(compiler)
 }

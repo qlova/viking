@@ -7,6 +7,68 @@ type Concept struct {
 	Cache
 }
 
+//Generate generates and returns the name and return type of this function.
+func (concept Concept) Generate(compiler *Compiler, args ...Expression) (name Token, returns Type, err error) {
+	if compiler.Functions == nil {
+		compiler.Functions = make(map[string]Type)
+	}
+
+	var id = concept.Name.String()
+
+	if r, ok := compiler.Functions[id]; ok {
+		returns = r
+	} else if !ok {
+
+		var context = compiler.NewContext()
+		context.Returns = &returns
+
+		//Simple case. A function with an unknown return value.
+		context.GainScope()
+
+		compiler.FlipBuffer()
+
+		for i, argument := range args {
+			if concept.Arguments[i].Variadic {
+				context.SetVariable(concept.Arguments[i].Token, Sequence{}.With(compiler, argument.Type))
+				break
+			}
+			context.SetVariable(concept.Arguments[i].Token, argument.Type)
+		}
+
+		if err := compiler.CompileCacheWithContext(concept.Cache, context); err != nil {
+			return Token(id), returns, err
+		}
+
+		var FunctionHeader = compiler.target
+
+		//Build function definition.
+		FunctionHeader.Go.WriteString("func ")
+		FunctionHeader.Go.Write(concept.Name)
+		FunctionHeader.Go.WriteString("(ctx I.Context")
+
+		for i, argument := range concept.Arguments {
+			FunctionHeader.Go.WriteString(",")
+			FunctionHeader.Go.Write(argument.Token)
+			FunctionHeader.Go.WriteString(" ")
+			if concept.Arguments[i].Variadic {
+				FunctionHeader.Go.WriteString("...")
+			}
+			FunctionHeader.Go.Write(compiler.GoTypeOf(args[i].Type))
+		}
+
+		FunctionHeader.Go.WriteString(")")
+		if returns != nil && Defined(returns) {
+			FunctionHeader.Go.Write(compiler.GoTypeOf(returns))
+		}
+		FunctionHeader.Go.WriteString("{\n")
+
+		compiler.DumpBufferHead(FunctionHeader.Go.Bytes())
+	}
+	compiler.Functions[concept.Name.String()] = returns
+
+	return Token(id), returns, nil
+}
+
 //Run runs a concept with the specified name wihout return values.
 func (concept Concept) Run(compiler *Compiler) error {
 	expression, err := concept.Call(compiler)
@@ -45,7 +107,7 @@ func (concept Concept) Call(compiler *Compiler) (Expression, error) {
 		if Defined(argument.Type) && !expression.Equals(argument.Type) {
 			expression, err = compiler.Cast(expression, argument.Type)
 			if err != nil {
-				return Expression{}, compiler.NewError("type mismatch got type " + expression.Type.Name + " expecting type " + argument.Type.Name)
+				return Expression{}, compiler.NewError("type mismatch got type " + expression.Type.String(compiler) + " expecting type " + argument.Type.String(compiler))
 			}
 		}
 
@@ -83,68 +145,14 @@ var errorConceptHasNoReturns = "function does not return any values and cannot b
 //CallConcept calls a concept with the specified name.
 func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Expression) (Expression, error) {
 
-	if compiler.Functions == nil {
-		compiler.Functions = make(map[string]*Type)
+	name, returns, err := concept.Generate(compiler, arguments...)
+	if err != nil {
+		return Expression{}, err
 	}
-
-	var returns = new(Type)
-
-	if r, ok := compiler.Functions[concept.Name.String()]; ok {
-		returns = r
-	} else if !ok {
-
-		var context = compiler.NewContext()
-		context.Returns = returns
-
-		//Simple case. A function with an unknown return value.
-		context.GainScope()
-
-		compiler.FlipBuffer()
-
-		for i, argument := range arguments {
-			if concept.Arguments[i].Variadic {
-				context.SetVariable(concept.Arguments[i].Token, argument.Type.Collection(Variadic))
-				break
-			}
-			context.SetVariable(concept.Arguments[i].Token, argument.Type)
-		}
-
-		if err := compiler.CompileCacheWithContext(concept.Cache, context); err != nil {
-			return Expression{}, err
-		}
-
-		var FunctionHeader = compiler.Target
-
-		//Build function definition.
-		FunctionHeader.Go.WriteString("func ")
-		FunctionHeader.Go.Write(concept.Name)
-		FunctionHeader.Go.WriteString("(ctx I.Context")
-
-		for i, argument := range concept.Arguments {
-			FunctionHeader.Go.WriteString(",")
-			FunctionHeader.Go.Write(argument.Token)
-			FunctionHeader.Go.WriteString(" ")
-			if concept.Arguments[i].Variadic {
-				FunctionHeader.Go.WriteString("...")
-			}
-			FunctionHeader.Go.Write(GoTypeOf(arguments[i].Type))
-		}
-
-		FunctionHeader.Go.WriteString(")")
-		if returns != nil && Defined(*returns) {
-			FunctionHeader.Go.Write(GoTypeOf(*returns))
-		}
-		FunctionHeader.Go.WriteString("{\n")
-
-		compiler.DumpBufferHead(FunctionHeader.Go.Bytes())
-	}
-	compiler.Functions[concept.Name.String()] = returns
 
 	var expression = compiler.NewExpression()
-	if returns != nil {
-		expression.Type = *returns
-	}
-	expression.Go.Write(concept.Name)
+	expression.Type = returns
+	expression.Go.Write(name)
 	expression.Go.WriteString("(ctx")
 	for _, argument := range arguments {
 		expression.Go.WriteString(",")
@@ -152,7 +160,7 @@ func (compiler *Compiler) generateAndCallConcept(concept Concept, arguments []Ex
 	}
 	expression.Go.WriteString(")")
 
-	if returns == nil || !Defined(*returns) {
+	if !Defined(returns) {
 		return expression, compiler.NewError(errorConceptHasNoReturns)
 	}
 

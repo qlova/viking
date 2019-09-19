@@ -8,6 +8,21 @@ import (
 	"github.com/qlova/viking/compiler/target"
 )
 
+//Statements is a list of registered statements.
+var Statements []Statement
+
+//RegisterStatement registers a global statement and returns it.
+func RegisterStatement(statement Statement) Statement {
+	Statements = append(Statements, statement)
+	return statement
+}
+
+//Statement is an 'i' language statement.
+type Statement interface {
+	Name() String
+	Compile(*Compiler) error
+}
+
 //CompileStatement compiles the next statement.
 func (compiler *Compiler) CompileStatement() (returning error) {
 	defer func(returning *error) {
@@ -30,7 +45,8 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 				}
 				compiler.Go.WriteString("; for i, error := range ctx.Errors() {")
 				compiler.GainScope()
-				compiler.SetVariable(s("i"), Integer)
+				//compiler.SetVariable(s("i"), Integer)
+				compiler.SetVariable(s("error"), Nothing{})
 				*returning = compiler.CompileBlock()
 				return
 			default:
@@ -87,33 +103,11 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 		}()
 		return compiler.CompileStatement()
 
-	//Main statement.
-	case "main":
-		//Wait for the rest of the package to compile.
-		if compiler.yield != nil {
-			compiler.yield <- true
-			<-compiler.callback
-		}
-		compiler.Main = true
-
-		compiler.Import(Ilang)
-		compiler.Go.WriteString("func main() {\n")
-		compiler.GainScope()
-		compiler.Indent()
-		compiler.Go.WriteString(`var ctx = I.NewContext()` + "\n")
-
-		compiler.SetFlag(s("main"))
-
-		return compiler.CompileBlock()
-
 	case ";":
 		return compiler.NewError("statement doesn't throw error")
 
-	case "if":
-		return compiler.ScanIfStatement()
-
 	case "|":
-		if !compiler.GetFlag(s("if")) {
+		if !compiler.Flag(s("if")) {
 			return compiler.NewError("| requires a preceding if statement")
 		}
 		compiler.LoseScope()
@@ -121,9 +115,6 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 		compiler.Go.WriteString("} else {")
 		compiler.GainScope()
 		return compiler.CompileBlock()
-
-	case "for":
-		return compiler.ScanForStatement()
 
 	//Return statement.
 	case "return":
@@ -153,9 +144,22 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 		compiler.Depth--
 		compiler.Indent()
 		compiler.Depth++
-		compiler.Go.Write(s("}"))
+
 		compiler.LoseScope()
+		compiler.Go.Write(s("}"))
+		compiler.JS.Write(s("}"))
+
+		if compiler.Main && compiler.Depth == 0 {
+			compiler.JS.Write(s("()"))
+		}
+
 		return nil
+	}
+
+	for _, statement := range Statements {
+		if statement.Name()[English] == token.String() {
+			return statement.Compile(compiler)
+		}
 	}
 
 	//Inline target code.
@@ -180,19 +184,38 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 		return compiler.NewError("expecting `[inline code]`")
 	}
 
-	//Is this a builtin call?
-	if Builtin(token) {
-		compiler.Indent()
-		return compiler.CompileBuiltin(token)
+	for _, builtin := range Builtins {
+		if token.Is(builtin.Name()[English]) {
+
+			if !compiler.ScanIf('(') {
+				return compiler.NewError("expecting call to builtin")
+			}
+
+			var args, err = compiler.Arguments()
+			if err != nil {
+				return err
+			}
+
+			return builtin.Run(compiler, Expression{}, args...)
+		}
 	}
 
-	//Array modification.
-	if compiler.Peek().Is("[") {
-		if Defined(compiler.GetVariable(token)) {
+	if T := compiler.GetVariable(token); Defined(T) {
+
+		var expression = compiler.NewExpression()
+		expression.Type = T
+		expression.Go.Write(token)
+
+		if runnable, ok := T.(Runnable); ok && compiler.Peek().Is("(") {
+
 			compiler.Scan()
 
-			compiler.Indent()
-			return compiler.ModifyCollection(token)
+			var args, err = compiler.Arguments()
+			if err != nil {
+				return err
+			}
+
+			return runnable.Run(compiler, expression, args...)
 		}
 	}
 
@@ -200,6 +223,44 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 	if compiler.ScanIf('=') {
 		compiler.DefineAlias(token)
 		return nil
+	}
+
+	//Collections.
+	if compiler.Peek().Is("[") {
+
+		variable := compiler.GetVariable(token)
+		if !Defined(variable) {
+			return compiler.Undefined(token)
+		}
+
+		collection, ok := variable.(Collection)
+		if !ok {
+			return compiler.NewError("cannot index " + token.String() + ", not a collection type")
+		}
+
+		var indicies, err = compiler.Indicies()
+		if err != nil {
+			return err
+		}
+
+		var expression = compiler.NewExpression()
+		expression.Type = variable
+		expression.Go.Write(token)
+
+		if !compiler.ScanIf('$') {
+			return compiler.Expecting('$')
+		}
+
+		if !compiler.ScanIf('=') {
+			return compiler.Expecting('=')
+		}
+
+		modification, err := compiler.ScanExpression()
+		if err != nil {
+			return err
+		}
+
+		return collection.Modify(compiler, expression, modification, indicies...)
 	}
 
 	//Variables.
@@ -215,9 +276,9 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 	}
 
 	//Function calls.
-	if T := compiler.GetVariable(token); Defined(T) && T.Is(Function) && compiler.Peek().Is("(") {
+	/*if T := compiler.GetVariable(token); Defined(T) && T.Is(Function) && compiler.Peek().Is("(") {
 		return compiler.CallFunction(token)
-	}
+	}*/
 
 	//Concept calls.
 	if concept, ok := compiler.Concepts[token.String()]; ok {
@@ -225,7 +286,7 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 	}
 
 	//Embedded types.
-	if T := compiler.GetType(token); Defined(T) {
+	/*if T := compiler.GetType(token); Defined(T) {
 		if !compiler.InsideTypeDefinition {
 			return compiler.NewError("Cannnot embed type here, are you in a type definition?")
 		}
@@ -253,7 +314,7 @@ func (compiler *Compiler) CompileStatement() (returning error) {
 		})
 
 		return nil
-	}
+	}*/
 
 	//If the compiler depth is zero then we can assume an implicit definition.
 	if compiler.Depth == 0 {

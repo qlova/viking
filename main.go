@@ -17,6 +17,9 @@ import (
 	"github.com/cosmos72/gomacro/fast"
 	"github.com/cosmos72/gomacro/imports"
 	"github.com/qlova/viking/compiler"
+	_ "github.com/qlova/viking/compiler/builtin"
+	_ "github.com/qlova/viking/compiler/statement"
+	_ "github.com/qlova/viking/compiler/types"
 
 	_ "github.com/qlova/i/imacro"
 )
@@ -146,8 +149,14 @@ func main() {
 	c.SetTarget(target.Go)
 
 	if len(os.Args) <= 1 {
-		fmt.Println("[usage] viking [build/test] path/to/package")
+		fmt.Println("[usage] viking [build/test] path/to/package [go/js]")
 		return
+	}
+
+	if len(os.Args) > 3 {
+		if os.Args[3] == "js" {
+			c.SetTarget(target.JS)
+		}
 	}
 
 	var directive = os.Args[1]

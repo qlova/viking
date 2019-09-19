@@ -12,6 +12,8 @@ import (
 )
 
 var Trace = os.Getenv("TRACE") != ""
+var Panic = os.Getenv("PANIC") != ""
+var Counter = 2
 
 type Error struct {
 	Formatted string
@@ -22,7 +24,9 @@ func (err Error) Error() string {
 	return err.Formatted
 }
 
-func (compiler *Compiler) NewError(msg string) error {
+func (compiler *Compiler) NewError(format ...interface{}) error {
+	var msg = fmt.Sprint(format...)
+
 	var wdir string
 	if runtime.GOOS != "js" {
 		wdir, _ = os.Getwd()
@@ -63,6 +67,13 @@ func (compiler *Compiler) NewError(msg string) error {
 			}
 		}
 
+	}
+
+	if Panic {
+		Counter--
+		if Counter == 0 {
+			panic(formatted)
+		}
 	}
 
 	return Error{formatted, msg}

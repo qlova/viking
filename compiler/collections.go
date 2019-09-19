@@ -1,9 +1,7 @@
 package compiler
 
-import "strconv"
-
 //ConcatArray joins two arrays.
-func (compiler *Compiler) ConcatArray(a, b Expression) (Expression, error) {
+/*func (compiler *Compiler) ConcatArray(a, b Expression) (Expression, error) {
 	if !b.Is(Array) && a.Equals(b.Type) {
 		return Expression{}, compiler.NewError("cannot add array and " + b.Type.Name)
 	}
@@ -204,3 +202,4 @@ func (compiler *Compiler) ModifyArray(array []byte) error {
 
 	return nil
 }
+*/

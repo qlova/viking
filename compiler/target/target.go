@@ -12,12 +12,15 @@ func (target Target) Valid() bool {
 	return target.string != ""
 }
 
+var Go = Target{"go", "Go"}
+var JS = Target{"js", "Javascript"}
+
 //Targets is a list of all possible targets.
 var Targets = []Target{
-	Target{"go", "Go"},
+	Go,
 	Target{"rs", "Rust"},
 	Target{"java", "Java"},
-	Target{"js", "Javascript"},
+	JS,
 	Target{"cs", "CSharp"},
 	Target{"py", "Python"},
 	Target{"lua", "Lua"},
@@ -58,26 +61,34 @@ func (buffer *Buffer) Get(target Target) *Mode {
 	}
 }
 
-//Go target.
-var Go = Buffer{Go: Mode{Enabled: true}}
-
 type Mode struct {
 	Enabled                bool
 	Head, Neck, Body, Tail bytes.Buffer
 }
 
-func (target *Mode) Bytes() []byte {
+func (target Mode) Bytes() []byte {
 	if target.Enabled {
 		return target.Body.Bytes()
 	}
 	return nil
 }
 
-func (target *Mode) String() string {
+func (target Mode) String() string {
 	if target.Enabled {
 		return target.Body.String()
 	}
 	return ""
+}
+
+type Bytes interface {
+	Bytes() []byte
+}
+
+func (target *Mode) WriteB(data Bytes) (int, error) {
+	if target.Enabled {
+		return target.Body.Write(data.Bytes())
+	}
+	return 0, nil
 }
 
 func (target *Mode) Write(data []byte) (int, error) {

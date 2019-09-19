@@ -42,6 +42,34 @@ func Precedence(symbol []byte) int {
 func (compiler *Compiler) Shunt(expression Expression, precedence int) (result Expression, err error) {
 	result = expression
 
+	//Callables.
+	if compiler.Peek().Is(".") {
+		if thing, ok := result.Type.(Thing); ok {
+			compiler.Scan()
+			return thing.Index(compiler, result, compiler.Scan())
+		}
+		return result, compiler.NewError("Cannot index ", result.Type.String(compiler))
+	}
+
+	//Callables.
+	if compiler.Peek().Is("(") {
+		if runnable, ok := result.Type.(Runnable); ok {
+			compiler.Scan()
+
+			var args, err = compiler.Arguments()
+			if err != nil {
+				return Expression{}, err
+			}
+
+			result, err = runnable.Call(compiler, result, args...)
+			if err != nil {
+				return result, err
+			}
+			return compiler.Shunt(result, precedence)
+		}
+		return result, compiler.NewError("Cannot call ", result.Type.String(compiler))
+	}
+
 	//shunting:
 	for peek := compiler.Peek(); Precedence(peek) >= precedence; {
 
@@ -49,7 +77,6 @@ func (compiler *Compiler) Shunt(expression Expression, precedence int) (result E
 			break
 		}
 
-		precedence := Precedence(peek)
 		symbol := peek
 		if compiler.Scan() == nil {
 			break
@@ -61,7 +88,7 @@ func (compiler *Compiler) Shunt(expression Expression, precedence int) (result E
 		}
 
 		peek = compiler.Peek()
-		for Precedence(peek) > precedence {
+		for Precedence(peek) > Precedence(symbol) {
 			rhs, err = compiler.Shunt(rhs, Precedence(peek))
 			if err != nil {
 				return result, err
@@ -70,99 +97,16 @@ func (compiler *Compiler) Shunt(expression Expression, precedence int) (result E
 			peek = compiler.Peek()
 		}
 
-		if result.Is(Array) || result.Is(List) {
-			if equal(symbol, "[") {
-				result, err = compiler.IndexArray(result, rhs)
-				if err != nil {
-					return result, err
-				}
-				continue
-			}
-		}
-
-		if expression.Is(Array) {
-			if equal(symbol, "+") {
-				result, err = compiler.ConcatArray(expression, rhs)
-				if err != nil {
-					return result, err
-				}
-				continue
-			}
-		}
-
-		if result.Equals(String) {
-			switch s := symbol.String(); s {
-			case "+":
-				result, err = compiler.BasicConcat(result, rhs)
-				if err != nil {
-					return result, err
-				}
-				continue
-			}
-		}
-
-		if result.Equals(Bit) {
-			switch s := symbol.String(); s {
-			case "-":
-				result, err = compiler.BasicXOr(result, rhs)
-			case "&":
-				result, err = compiler.BasicAnd(result, rhs)
-			case "|":
-				result, err = compiler.BasicOr(result, rhs)
-			}
+		ok, expression, err := result.Operation(compiler, result, rhs, symbol.String())
+		if ok {
+			result = expression
 			if err != nil {
 				return result, err
 			}
 			continue
 		}
 
-		switch s := symbol.String(); s {
-		case "=":
-			result, err = compiler.BasicEquals(result, rhs)
-			if err != nil {
-				return result, err
-			}
-			continue
-		}
-
-		if result.Equals(Integer) {
-			switch s := symbol.String(); s {
-			case "=":
-				result, err = compiler.BasicEquals(result, rhs)
-			case "<":
-				result, err = compiler.BasicLessThan(result, rhs)
-			case ">":
-				result, err = compiler.BasicGreaterThan(result, rhs)
-			case "+":
-				result, err = compiler.BasicAdd(result, rhs)
-			case "*":
-				result, err = compiler.BasicMultiply(result, rhs)
-			case "-":
-				result, err = compiler.BasicSubtract(result, rhs)
-			case "%":
-				result, err = compiler.Mod(result, rhs)
-			case "!":
-				result, err = compiler.BasicNotEquals(result, rhs)
-			case "^":
-				result, err = compiler.Pow(result, rhs)
-			case "/":
-				result, err = compiler.Divide(result, rhs)
-			}
-			if err != nil {
-				return result, err
-			}
-			continue
-		}
-
-		//Lets do the shunting!
-
-		/*for i := range c.Shunts {
-			if result = c.Shunts[i](c, symbol, t, rhs); result != nil {
-				continue shunting
-			}
-		}*/
-
-		return Expression{}, compiler.NewError("Operator " + string(symbol) + " does not apply to " + result.Name)
+		return Expression{}, compiler.NewError("Operator " + string(symbol) + " does not apply to " + result.String(compiler) + " and " + rhs.String(compiler))
 	}
 	return result, nil
 }

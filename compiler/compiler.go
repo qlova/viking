@@ -33,7 +33,10 @@ type Compiler struct {
 	Context
 	target.Buffer
 
-	Target target.Buffer
+	Target target.Target
+	target target.Buffer
+
+	Language
 
 	ExpectedOutput []byte
 	ProvidedInput  []byte
@@ -68,9 +71,10 @@ func New() Compiler {
 
 //Init initialises the compiler.
 func (compiler *Compiler) Init() {
-	compiler.Functions = make(map[string]*Type)
+	compiler.Functions = make(map[string]Type)
 	compiler.Concepts = make(map[string]Concept)
 	compiler.Aliases = make(map[string]Alias)
+	compiler.Language = English
 }
 
 //NewScope creates and returns a new compiler scope.
@@ -80,10 +84,26 @@ func NewScope() Scope {
 	}
 }
 
+//SetMain signals the compiler that we have reached main.
+func (compiler *Compiler) SetMain() {
+	//Wait for the rest of the package to compile.
+	if compiler.yield != nil {
+		compiler.yield <- true
+		<-compiler.callback
+	}
+	compiler.Main = true
+}
+
 //SetTarget sets the compiler target.
-func (compiler *Compiler) SetTarget(target target.Buffer) {
-	compiler.Target = target
-	compiler.Buffer = target
+func (compiler *Compiler) SetTarget(t target.Target) {
+	var buffer = target.Buffer{Go: target.Mode{Enabled: true}}
+	if t == target.JS {
+		buffer = target.Buffer{JS: target.Mode{Enabled: true}}
+	}
+	compiler.Target = t
+	compiler.target = buffer
+	compiler.Buffer = buffer
+
 }
 
 //PushScope pushes a new scopeset to the compiler.
@@ -108,6 +128,7 @@ func (compiler *Compiler) PopScope() {
 type Scope struct {
 	Table    map[string]Type
 	Cleanups []func()
+	Afters   []func()
 }
 
 //DeferCleanup schedules the function to run at the end of the current scope.
@@ -122,23 +143,39 @@ func (compiler *Compiler) FlipBuffer() *target.Buffer {
 
 	compiler.Buffers = append(compiler.Buffers, current)
 
-	compiler.Buffer = compiler.Target
+	compiler.Buffer = compiler.target
 
 	return &compiler.Buffers[len(compiler.Buffers)-1]
 }
 
 //DumpBuffer collapses the current buffer onto the old one.
-func (compiler *Compiler) DumpBuffer() {
+func (compiler *Compiler) DumpBuffer(split []byte) {
 	var last = compiler.Buffers[len(compiler.Buffers)-1]
 
 	last.Go.Head.Write(compiler.Go.Head.Bytes())
 	last.Go.Neck.Write(compiler.Go.Neck.Bytes())
+	last.Go.Neck.Write(split)
 	last.Go.Write(compiler.Go.Bytes())
 	last.Go.Tail.Write(compiler.Go.Tail.Bytes())
 
 	compiler.Buffer = last
 
 	compiler.Buffers = compiler.Buffers[:len(compiler.Buffers)-1]
+}
+
+//DumpAndReturnBuffer collapses the current buffer onto the old one.
+func (compiler *Compiler) DumpAndReturnBuffer(split []byte) (result []byte) {
+	var last = compiler.Buffers[len(compiler.Buffers)-1]
+
+	last.Go.Head.Write(compiler.Go.Head.Bytes())
+	last.Go.Neck.Write(compiler.Go.Neck.Bytes())
+	result = append(split, compiler.Go.Bytes()...)
+	last.Go.Tail.Write(compiler.Go.Tail.Bytes())
+
+	compiler.Buffer = last
+
+	compiler.Buffers = compiler.Buffers[:len(compiler.Buffers)-1]
+	return
 }
 
 //DumpBufferHead collapses the current buffer onto the old one, writing the body onto the head.
@@ -161,7 +198,7 @@ func (compiler *Compiler) DumpBufferHead(split []byte) {
 func (compiler *Compiler) LoseScope() {
 
 	//Cleanup
-	if compiler.InsideTypeDefinition {
+	/*if compiler.InsideTypeDefinition {
 		compiler.Indent()
 		compiler.Go.Write(s("return " + compiler.TypeName.String() + "{}\n"))
 
@@ -178,7 +215,7 @@ func (compiler *Compiler) LoseScope() {
 		compiler.Go.Neck.Write(s("}\n\n"))
 
 		compiler.TypeDefinition = Type{}
-	}
+	}*/
 
 	var scope = compiler.Scope[len(compiler.Scope)-1]
 	for _, cleanup := range scope.Cleanups {
@@ -220,7 +257,7 @@ func (compiler *Compiler) Require(code string) {
 
 		compiler.FlipBuffer()
 		compiler.Go.Neck.Write([]byte(code))
-		compiler.DumpBuffer()
+		compiler.DumpBuffer(nil)
 	}
 }
 
@@ -229,6 +266,7 @@ func (compiler *Compiler) Indent(writers ...io.Writer) {
 	if len(writers) == 0 {
 		for i := 0; i < compiler.Depth; i++ {
 			compiler.Go.Write([]byte{'\t'})
+			compiler.JS.Write([]byte{'\t'})
 		}
 	} else {
 		var writer = writers[0]
@@ -330,7 +368,12 @@ func (compiler *Compiler) CompileBlock() error {
 	if compiler.ScanIf(':') {
 		defer func() {
 			compiler.LoseScope()
-			compiler.Go.Write([]byte("}"))
+			compiler.Go.Write([]byte("\n}"))
+			compiler.JS.Write([]byte("\n}"))
+
+			if compiler.Main && compiler.Depth == 0 {
+				compiler.JS.Write(s("main();"))
+			}
 		}()
 		if err := compiler.CompileStatement(); err != nil {
 			return err
@@ -397,22 +440,22 @@ func (compiler *Compiler) CompileReader(reader io.Reader) error {
 //WriteTo writes the compiler's output buffer to the specified buffer.
 func (compiler *Compiler) WriteTo(writer io.Writer) (int64, error) {
 	var sum int
-	if n, err := writer.Write(compiler.Go.Head.Bytes()); err != nil {
+	if n, err := writer.Write(compiler.Get(compiler.Target).Head.Bytes()); err != nil {
 		return int64(n), err
 	} else {
 		sum += n
 	}
-	if n, err := writer.Write(compiler.Go.Neck.Bytes()); err != nil {
+	if n, err := writer.Write(compiler.Get(compiler.Target).Neck.Bytes()); err != nil {
 		return int64(n), err
 	} else {
 		sum += n
 	}
-	if n, err := writer.Write(compiler.Go.Bytes()); err != nil {
+	if n, err := writer.Write(compiler.Get(compiler.Target).Bytes()); err != nil {
 		return int64(n), err
 	} else {
 		sum += n
 	}
-	if n, err := writer.Write(compiler.Go.Tail.Bytes()); err != nil {
+	if n, err := writer.Write(compiler.Get(compiler.Target).Tail.Bytes()); err != nil {
 		return int64(n), err
 	} else {
 		sum += n

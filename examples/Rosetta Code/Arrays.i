@@ -1,7 +1,7 @@
 //output: 2\n2\n
 main
 	//Fixed-length arrays.
-	f $= array.integer[1]()
+	f $= array[1].integer()
 	f[0] $= 2
 	print(f[0])
 
